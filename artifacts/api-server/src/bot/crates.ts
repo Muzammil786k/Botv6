@@ -21,7 +21,8 @@ const MAX_INTERVAL_MINUTES = 24 * 60;
 const CRATE_LIFETIME_MS = 10 * 60_000;
 const SCHEDULER_INTERVAL_MS = 30_000;
 const REACTION = "🌦️";
-const CREDIT_REWARD = 30;
+const MIN_CREDIT_REWARD = 10;
+const MAX_CREDIT_REWARD = 100;
 
 let scheduler: NodeJS.Timeout | undefined;
 let schedulerRunning = false;
@@ -31,11 +32,11 @@ function creditDropEmbed(expiresAt: number): EmbedBuilder {
     .setColor(0x9b59b6)
     .setTitle("Credit Drop!")
     .setDescription(
-      `<:click:1558393065616707674> **React** to this message with the emoji below to win!\n\n` +
+      "<:click:1558393065616707674> **React** to this message with the emoji below to win!\n\n" +
       `<:reaction:1558393068254666785>  **Reaction:** ${REACTION}\n` +
       "<:trophy:1558393071224365102>  **First valid reaction wins!**\n\n" +
       "<:epic:1558393073204076607> **Rarity:** Epic\n" +
-      `<:reward:1558393075829702726> **Reward:** ${CREDIT_REWARD} Credits\n` +
+      `<:reward:1558393075829702726> **Reward:** ${MIN_CREDIT_REWARD}–${MAX_CREDIT_REWARD} Credits\n` +
       `<:time:1558393079851917372> **Expires:** <t:${Math.floor(expiresAt / 1000)}:R>`,
     );
 }
@@ -199,13 +200,14 @@ async function spawnCreditDrop(
     throw new Error(`Configured credit drop channel ${settings.channelId} is unavailable or not a text channel`);
   }
   const expiresAt = Date.now() + CRATE_LIFETIME_MS;
+  const creditReward = Math.floor(Math.random() * (MAX_CREDIT_REWARD - MIN_CREDIT_REWARD + 1)) + MIN_CREDIT_REWARD;
   const message = await channel.send({ embeds: [creditDropEmbed(expiresAt)] });
   try {
     await message.react(REACTION);
     await db.update(botCrateSettingsTable)
       .set({
         activeMessageId: message.id,
-        activeCreditReward: CREDIT_REWARD,
+        activeCreditReward: creditReward,
         activeExpiresAt: expiresAt,
         updatedAt: new Date(),
       })
@@ -340,15 +342,17 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
 
   if (!result) return;
   try {
-    await reaction.message.edit({
-      content: `🎉 <@${user.id}>`,
+    await reaction.message.reply({
+      content: `<@${user.id}>`,
       embeds: [
         new EmbedBuilder()
           .setColor(0x9b59b6)
-          .setTitle("Credit Drop Claimed!")
           .setDescription(
-            `**+${result.credits} Credits**\nBalance: **${result.balance.toLocaleString()} credits**`,
-          ),
+            `<:common:1558505660470010070> <@${user.id}> received <:credits:1558505663531851933> **__${result.credits}__** **credits!**\n\n` +
+            `<a:gift:1558505667038289990> Total Crates Claimed: \`${result.totalCreditDropsClaimed.toLocaleString()}\`\n` +
+            "Use `!credits` to view your credits",
+          )
+          .setTimestamp(new Date(now)),
       ],
       allowedMentions: { users: [user.id] },
     });

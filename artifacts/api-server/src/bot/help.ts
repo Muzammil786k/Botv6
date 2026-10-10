@@ -173,8 +173,8 @@ function page5(): EmbedBuilder {
       { name: "`!wbstop` / `!wordbomb stop` • `/wbstop`", value: "Stop the current Word Bomb game.\n*(Manage Server)*" },
       { name: "`!wbtop` • `/wbtop`", value: "Show the Word Bomb win leaderboard for this server." },
       { name: "✅ **Command notes**", value: "Slash commands appear server-by-server after the bot starts. Prefix commands continue to work as before.\n\nFor accurate online/offline presence counts, enable **Server Members Intent** and **Presence Intent** in the Discord Developer Portal." },
-      { name: "💳 **Credits**", value: "Check your balance with `!credit`. Earn **20 credits** from chat once per minute, **20 credits** with `!work` once per hour, or **30 credits** in a reaction drop. Spend credits on server roles with `!shop` and `!shop buy @role`." },
-      { name: "🦉 **Credit drops**", value: "An Epic reaction drop appears every **30 minutes**. The first 🌦️ reaction wins **30 credits**, added to the winner's balance. Server managers set the channel with `!creditdrop setup #channel`; change the interval with `!creditdrop interval 1h` (30m–24h). Check, pause, or resume with `!creditdrop status|pause|resume`." },
+      { name: "💳 **Credits**", value: "Check your balance with `!credit` or `!credits`. Earn **20 credits** from chat once per minute, **20 credits** with `!work` once per hour, or **10–100 credits** in a reaction drop. Spend credits on server roles with `!shop` and `!shop buy @role`." },
+      { name: "🦉 **Credit drops**", value: "An Epic reaction drop appears every **30 minutes**. The first 🌦️ reaction wins **10–100 random credits**, added to the winner's balance. Server managers set the channel with `!creditdrop setup #channel`; change the interval with `!creditdrop interval 1h` (30m–24h). Check, pause, or resume with `!creditdrop status|pause|resume`." },
     )
     .setFooter({ text: HELP_FOOTER });
 }
@@ -182,7 +182,7 @@ function page5(): EmbedBuilder {
 function pageEconomy(): EmbedBuilder {
   return helpPage("💰 Economy")
     .addFields(
-      { name: "💳 **Credits**", value: "`!credit` — check your balance\n`!work` / `/work` — earn **20 credits** once per hour\nChat and credit drops are other ways to earn." },
+      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\n`!work` / `/work` — earn **20 credits** once per hour\nChat and credit drops are other ways to earn." },
       { name: "🏷️ **Role shop**", value: "`!shop` — browse numbered role/price pages\n`!shop buy @role` — buy with credits\n`!shop add @role <price>` — add a listing\n`!shop edit @role <new-price>` — edit its price\n`!shop remove @role` — remove a listing (**Manage Server**)" },
     )
     .setFooter({ text: HELP_FOOTER });
@@ -220,17 +220,12 @@ const REACTION_ACTIONS: SocialActionName[] = [
   "dance",
   "punch",
   "cry",
-  "facepalm",
   "roast",
   "cartoonkick",
   "laugh",
   "shrug",
-  "smug",
-  "stare",
   "think",
-  "tickle",
   "wink",
-  "yeet",
   "clap",
 ];
 

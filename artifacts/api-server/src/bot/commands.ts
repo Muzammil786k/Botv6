@@ -165,7 +165,7 @@ export async function handleMessage(
     await handleWordbombStop(message);
   } else if (lower === "!wbtop") {
     await handleWbTop(message);
-  } else if (lower === "!credit") {
+  } else if (lower === "!credit" || lower === "!credits") {
     await handleCreditCommand(message);
   } else if (lower === "!work") {
     await handleWorkCommand(message);

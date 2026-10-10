@@ -119,7 +119,7 @@ export const SOCIAL_ACTIONS = {
     description: "Give a member a nose boop.",
     title: "👉 Boop!",
     help: "Give someone a friendly nose boop.",
-    gifCategory: "pat",
+    gifCategory: "boop",
     render: (actor, target) => `${actor} boops ${target}'s nose! Boop!`,
   },
   dance: {
@@ -199,13 +199,6 @@ export const SOCIAL_ACTIONS = {
     gifCategory: "feed",
     render: (actor, target) => `${actor} offers ${target} a tasty snack!`,
   },
-  facepalm: {
-    description: "React to a member's silly moment.",
-    title: "🤦 Facepalm!",
-    help: "Share a playful facepalm reaction.",
-    gifCategory: "facepalm",
-    render: (actor, target) => `${actor} facepalms at ${target}'s antics.`,
-  },
   cartoonkick: {
     description: "Give a member a harmless cartoon kick.",
     title: "🦵 Cartoon kick!",
@@ -241,20 +234,6 @@ export const SOCIAL_ACTIONS = {
     gifCategory: "shrug",
     render: (actor, target) => `${actor} shrugs with ${target}.`,
   },
-  smug: {
-    description: "Give a member a smug anime look.",
-    title: "😏 Smug!",
-    help: "Send someone a smug anime reaction.",
-    gifCategory: "smug",
-    render: (actor, target) => `${actor} gives ${target} a smug look.`,
-  },
-  stare: {
-    description: "Give a member a dramatic anime stare.",
-    title: "👀 Stare!",
-    help: "Send someone a dramatic stare.",
-    gifCategory: "stare",
-    render: (actor, target) => `${actor} stares dramatically at ${target}.`,
-  },
   think: {
     description: "Think through something with a member.",
     title: "🤔 Thinking...",
@@ -262,26 +241,12 @@ export const SOCIAL_ACTIONS = {
     gifCategory: "think",
     render: (actor, target) => `${actor} thinks this one over with ${target}.`,
   },
-  tickle: {
-    description: "Give a member a playful tickle.",
-    title: "😆 Tickle!",
-    help: "Give someone a playful tickle.",
-    gifCategory: "tickle",
-    render: (actor, target) => `${actor} gives ${target} a playful tickle!`,
-  },
   wink: {
     description: "Send a friendly wink to a member.",
     title: "😉 Wink!",
     help: "Send someone a friendly wink.",
     gifCategory: "wink",
     render: (actor, target) => `${actor} gives ${target} a friendly wink!`,
-  },
-  yeet: {
-    description: "Yeet a member in a silly anime-style scene.",
-    title: "🚀 Yeet!",
-    help: "Send someone flying in a silly, cartoon-style scene.",
-    gifCategory: "yeet",
-    render: (actor, target) => `${actor} yeets ${target} into a silly anime scene!`,
   },
   clap: {
     description: "Give a member a round of applause.",
@@ -600,7 +565,6 @@ const BACK_LABELS: Partial<Record<SocialActionName, string>> = {
   poke: "Poke back 👉",
   boop: "Boop back 👉",
   bonk: "Bonk back 🔨",
-  tickle: "Tickle back 😆",
 };
 const BACK_NOUNS: Partial<Record<SocialActionName, string>> = {
   hug: "hug",
@@ -614,7 +578,6 @@ const BACK_NOUNS: Partial<Record<SocialActionName, string>> = {
   poke: "poke",
   boop: "boop",
   bonk: "bonk",
-  tickle: "tickle",
 };
 
 function isSocialActionName(name: string): name is SocialActionName {
@@ -641,44 +604,9 @@ const GIFS_PER_REQUEST = 20;
 const GIF_POOL_BATCHES = 4;
 const GIF_POOL_REFILL_THRESHOLD = 5;
 const RECENT_GIF_HISTORY = 100;
-const RELATED_GIF_CATEGORIES: Record<string, string[]> = {
-  bite: ["bite", "nom", "feed", "kiss"],
-  blush: ["blush", "kiss", "wink", "handhold"],
-  bonk: ["bonk", "pat", "punch", "slap"],
-  clap: ["clap", "highfive", "dance", "happy"],
-  cuddle: ["cuddle", "hug", "handhold", "pat"],
-  cry: ["cry", "pout", "facepalm", "hug"],
-  dance: ["dance", "clap", "happy", "smile"],
-  facepalm: ["facepalm", "shrug", "stare", "think"],
-  feed: ["feed", "nom", "bite", "happy"],
-  handhold: ["handhold", "hug", "cuddle", "kiss"],
-  happy: ["happy", "smile", "cheer", "clap"],
-  highfive: ["highfive", "clap", "wave", "dance"],
-  hug: ["hug", "cuddle", "pat", "handhold"],
-  kick: ["kick", "yeet", "punch", "slap"],
-  kiss: ["kiss"],
-  laugh: ["laugh", "smile", "happy", "shrug"],
-  nom: ["nom", "feed", "bite", "happy"],
-  pat: ["pat", "boop", "hug", "cuddle"],
-  poke: ["poke", "boop", "pat", "slap"],
-  pout: ["pout", "blush", "cry", "smile"],
-  punch: ["punch", "slap", "kick", "bonk"],
-  shrug: ["shrug", "facepalm", "stare", "think"],
-  shoot: ["shoot"],
-  slap: ["slap", "punch", "bonk", "kick"],
-  smile: ["smile", "happy", "wink", "wave"],
-  smug: ["smug", "stare", "wink", "think"],
-  stare: ["stare", "smug", "think", "facepalm"],
-  think: ["think", "stare", "shrug", "smug"],
-  tickle: ["tickle", "poke", "cuddle", "hug"],
-  wave: ["wave", "smile", "highfive", "wink"],
-  wink: ["wink", "smile", "blush", "smug"],
-  yeet: ["yeet", "kick", "punch", "slap", "bonk"],
-};
 const recentGifUrlsByCategory = new Map<string, Set<string>>();
 const gifPoolsByCategory = new Map<string, (NekoGifResult & { url: string })[]>();
 const gifPoolLoadsByCategory = new Map<string, Promise<void>>();
-const gifSourceOffsetsByCategory = new Map<string, number>();
 
 async function refillGifPool(category: string): Promise<void> {
   const pool = gifPoolsByCategory.get(category) ?? [];
@@ -691,13 +619,9 @@ async function refillGifPool(category: string): Promise<void> {
   }
 
   const load = (async () => {
-    const sourceCategories = RELATED_GIF_CATEGORIES[category] ?? [category];
-    const sourceOffset = gifSourceOffsetsByCategory.get(category) ?? 0;
-    gifSourceOffsetsByCategory.set(category, (sourceOffset + GIF_POOL_BATCHES) % sourceCategories.length);
     const batches = await Promise.allSettled(
-      Array.from({ length: GIF_POOL_BATCHES }, async (_, index) => {
-        const sourceCategory = sourceCategories[(sourceOffset + index) % sourceCategories.length]!;
-        const endpoint = new URL(`https://nekos.best/api/v2/${sourceCategory}`);
+      Array.from({ length: GIF_POOL_BATCHES }, async () => {
+        const endpoint = new URL(`https://nekos.best/api/v2/${category}`);
         endpoint.searchParams.set("amount", String(GIFS_PER_REQUEST));
         const response = await fetch(endpoint, {
           headers: {
@@ -707,7 +631,7 @@ async function refillGifPool(category: string): Promise<void> {
           signal: AbortSignal.timeout(5_000),
         });
         if (!response.ok) {
-          throw new Error(`Anime GIF service returned HTTP ${response.status} for ${sourceCategory}`);
+          throw new Error(`Anime GIF service returned HTTP ${response.status} for ${category}`);
         }
         const data = (await response.json()) as NekoGifResponse;
         return data.results ?? [];
