@@ -139,6 +139,7 @@ function page5(): EmbedBuilder {
 function pageEconomy(): EmbedBuilder {
   return helpPage("💰 Economy")
     .addFields(
+      { name: "💳 **Credits**", value: "`!credit` — check your balance\n`!work` / `/work` — earn **20 credits** once per hour\nChat and credit drops are other ways to earn." },
       { name: "🏷️ **Role shop**", value: "`!shop` — browse numbered role/price pages\n`!shop buy @role` — buy with credits\n`!shop add @role <price>` — add a listing\n`!shop edit @role <new-price>` — edit its price\n`!shop remove @role` — remove a listing (**Manage Server**)" },
     )
     .setFooter({ text: HELP_FOOTER });
@@ -150,6 +151,9 @@ const FRIENDLY_ACTIONS: SocialActionName[] = [
   "wave",
   "smile",
   "cheer",
+  "thanks",
+  "comfort",
+  "celebrate",
   "compliment",
 ];
 const AFFECTION_ACTIONS: SocialActionName[] = [
@@ -219,6 +223,7 @@ function scoresCategory(): EmbedBuilder {
       { name: "`!rizz @user` • `/rizz user`", value: "Show that member's daily rizz score out of 100." },
       { name: "`!vibecheck @user` • `/vibecheck user`", value: "Show that member's daily vibe score out of 100." },
       { name: "`!rate @user` • `/rate user`", value: "Give that member a playful daily rating out of 10." },
+      { name: "`!iq @user` • `/iq user`", value: "Show that member's daily, for-fun IQ score out of 200." },
       { name: "`!ship @user1 @user2` • `/ship user1 user2`", value: "Show a fun compatibility score for two different members." },
     )
     .setFooter({ text: HELP_FOOTER });

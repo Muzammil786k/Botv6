@@ -38,7 +38,7 @@ import { handleJtcCommand, handleVcCommand } from "./joinToCreate";
 import { handleTicketCommand } from "./tickets";
 import { handleSocialRoleCommand } from "./socialRole";
 import { handleCreditCommand, handleRoleShopCommand } from "./roleShop";
-import { awardChatCredits } from "./credits";
+import { awardChatCredits, handleWorkCommand } from "./credits";
 import { handleCreditDropCommand } from "./crates";
 import { handleEmbedCommand } from "./embeds";
 import { logger } from "../lib/logger";
@@ -167,6 +167,8 @@ export async function handleMessage(
     await handleWbTop(message);
   } else if (lower === "!credit") {
     await handleCreditCommand(message);
+  } else if (lower === "!work") {
+    await handleWorkCommand(message);
   } else if (lower === "!shop" || lower.startsWith("!shop ")) {
     const args = content.split(/\s+/).slice(1);
     await handleRoleShopCommand(message, args);

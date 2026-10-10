@@ -29,16 +29,11 @@ let schedulerRunning = false;
 function creditDropEmbed(expiresAt: number): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(0x9b59b6)
-    .setTitle("A Credit Drop Has Appeared!")
+    .setTitle("Credit Drop!")
     .setDescription(
-      `<:click:1558393065616707674> **React** to this message with the emoji below to win!\n\n` +
-      `<:reaction:1558393068254666785> **Reaction:** ${REACTION}\n\n` +
-      "<:trophy:1558393071224365102> **First valid reaction wins!**\n\n" +
-      "<:epic:1558393073204076607> **Rarity:** Epic\n" +
-      `<:reward:1558393075829702726> **Reward:** ${CREDIT_REWARD} Reputation\n` +
-      `<:time:1558393079851917372> **Expires:** <t:${Math.floor(expiresAt / 1000)}:R>`,
-    )
-    .setFooter({ text: "Reputation is added to your !credit balance and can be spent in !shop." });
+      `React with ${REACTION} first to win **${CREDIT_REWARD} Reputation**.\n` +
+      `Expires <t:${Math.floor(expiresAt / 1000)}:R>`,
+    );
 }
 
 function parseInterval(value: string | undefined): number | null {
@@ -283,7 +278,9 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
   if (reaction.partial) await reaction.fetch();
   if (reaction.message.partial) await reaction.message.fetch();
   if (!reaction.message.guild) return;
-  if (!reaction.message.embeds.some((embed) => embed.title === "A Credit Drop Has Appeared!")) return;
+  if (!reaction.message.embeds.some((embed) =>
+    embed.title === "Credit Drop!" || embed.title === "A Credit Drop Has Appeared!"
+  )) return;
 
   const now = Date.now();
   const result = await db.transaction(async (tx) => {
@@ -338,25 +335,16 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
   });
 
   if (!result) return;
-  const displayName = (reaction.message.guild.members.cache.get(user.id)?.displayName ?? user.globalName ?? user.username)
-    .replace(/@/g, "@\u200b");
   try {
-    await reaction.message.reply({
-      content: `🎉 <@${user.id}> was first! You won **${result.credits} Reputation**, added to your credit balance. Your new balance is **${result.balance.toLocaleString()} credits**.`,
-      allowedMentions: { users: [user.id] },
-    });
     await reaction.message.edit({
+      content: `🎉 <@${user.id}>`,
       embeds: [
         new EmbedBuilder()
           .setColor(0x9b59b6)
           .setTitle("Credit Drop Claimed!")
           .setDescription(
-            `Congratulations ${displayName}! <@${user.id}> earned **${result.credits} Reputation**.\n\n` +
-            `New balance: **${result.balance.toLocaleString()} credits**\n` +
-            `Total drops claimed: **${result.totalCreditDropsClaimed.toLocaleString()}**\n\n` +
-            "Spend credits in the server role shop with `!shop`.",
-          )
-          .setTimestamp(),
+            `**+${result.credits} Reputation**\nBalance: **${result.balance.toLocaleString()} credits**`,
+          ),
       ],
       allowedMentions: { users: [user.id] },
     });

@@ -241,6 +241,9 @@ const slashCommands = [
     .setName("wbtop")
     .setDescription("Show the Word Bomb leaderboard."),
   new SlashCommandBuilder()
+    .setName("work")
+    .setDescription("Work to earn 20 credits. Available once per hour."),
+  new SlashCommandBuilder()
     .setName("ship")
     .setDescription("Get a playful compatibility score for two members.")
     .addUserOption((o) => o.setName("user1").setDescription("First member").setRequired(true))

@@ -1,6 +1,5 @@
 import {
   ActionRowBuilder,
-  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
@@ -8,7 +7,6 @@ import {
   type Message,
 } from "discord.js";
 import { logger } from "../lib/logger";
-import { renderShipImage } from "./shipImage";
 import { canUseSocialCommands, canUseSocialCommandsForMember } from "./socialRole";
 
 interface SocialAction {
@@ -137,6 +135,27 @@ export const SOCIAL_ACTIONS = {
     help: "Cheer someone on and brighten their day.",
     gifCategory: "happy",
     render: (actor, target) => `${actor} cheers ${target} on! You’ve got this!`,
+  },
+  thanks: {
+    description: "Thank a member.",
+    title: "💛 Thanks!",
+    help: "Send someone a quick thank-you.",
+    gifCategory: "highfive",
+    render: (actor, target) => `${actor} thanks ${target}!`,
+  },
+  comfort: {
+    description: "Comfort a member.",
+    title: "🫂 Comfort",
+    help: "Send someone a little comfort.",
+    gifCategory: "hug",
+    render: (actor, target) => `${actor} is here for ${target}. Sending comfort and a hug.`,
+  },
+  celebrate: {
+    description: "Celebrate with a member.",
+    title: "🎉 Celebrate!",
+    help: "Celebrate a win or good news with someone.",
+    gifCategory: "dance",
+    render: (actor, target) => `${actor} celebrates with ${target}!`,
   },
   handhold: {
     description: "Hold hands with a member.",
@@ -327,6 +346,16 @@ export const SOCIAL_ACTIONS = {
       return `Today's totally-for-fun rating for **${target}**: **${(score / 10).toFixed(1)}/10** ⭐`;
     },
   },
+  iq: {
+    description: "Get a member's playful daily IQ score.",
+    title: "🧠 IQ check",
+    help: "Show someone's daily, for-fun IQ score out of 200.",
+    gifCategory: "think",
+    render: (_actor, target, targetId) => {
+      const score = dailyScore("iq", targetId, 0, 200);
+      return `**${target}** has **${score} IQ** today. Just for fun!`;
+    },
+  },
   compliment: {
     description: "Send a member a friendly compliment.",
     title: "💛 A little appreciation",
@@ -376,9 +405,16 @@ const SCORE_ACTIONS: ReadonlySet<SocialActionName> = new Set([
   "rizz",
   "vibecheck",
   "rate",
+  "iq",
 ]);
 
-function buildScoreCard(actionName: SocialActionName, targetName: string, targetId: string, avatarUrl: string): EmbedBuilder {
+function buildScoreCard(
+  actionName: SocialActionName,
+  targetName: string,
+  targetId: string,
+  avatarUrl: string,
+  gifUrl?: string,
+): EmbedBuilder {
   let score: number;
   let minimum: number;
   let maximum: number;
@@ -434,6 +470,20 @@ function buildScoreCard(actionName: SocialActionName, targetName: string, target
       reading = "A totally-for-fun daily rating.";
       break;
     }
+    case "iq": {
+      score = dailyScore("iq", targetId, 0, 200);
+      minimum = 0;
+      maximum = 200;
+      scoreLabel = `${score} IQ`;
+      reading = score >= 160
+        ? "Big-brain energy."
+        : score >= 110
+          ? "Sharp thinking today."
+          : score >= 70
+            ? "Steady everyday smarts."
+            : "Brain is buffering—try again tomorrow.";
+      break;
+    }
     default:
       throw new Error(`No score card is defined for ${actionName}`);
   }
@@ -443,16 +493,10 @@ function buildScoreCard(actionName: SocialActionName, targetName: string, target
 
   return new EmbedBuilder()
     .setColor(0x2b2d31)
-    .setAuthor({ name: "DAILY SCORECARD" })
+    .setAuthor({ name: targetName, iconURL: avatarUrl })
     .setTitle(SOCIAL_ACTIONS[actionName].title)
-    .setDescription(`Today's reading for **${targetName}**`)
-    .setThumbnail(avatarUrl)
-    .addFields(
-      { name: "SCORE", value: `**${scoreLabel}**\n${meter}`, inline: true },
-      { name: "READING", value: reading, inline: true },
-    )
-    .setFooter({ text: "Refreshes daily • Just for fun" })
-    .setTimestamp();
+    .setDescription(`**${scoreLabel}**\n${meter}\n${reading}`)
+    .setThumbnail(gifUrl ?? avatarUrl);
 }
 
 function auraMood(score: number): { color: number; title: string; reading: string; gifCategory: string } {
@@ -529,6 +573,7 @@ const NON_INTERACTION_ACTIONS: ReadonlySet<string> = new Set([
   "rate",
   "rizz",
   "vibecheck",
+  "iq",
   "roast",
   "compliment",
 ]);
@@ -580,7 +625,7 @@ interface NekoGifResponse {
 }
 
 const GIFS_PER_REQUEST = 20;
-const GIF_POOL_BATCHES = 3;
+const GIF_POOL_BATCHES = 4;
 const GIF_POOL_REFILL_THRESHOLD = 5;
 const RECENT_GIF_HISTORY = 100;
 const RELATED_GIF_CATEGORIES: Record<string, string[]> = {
@@ -719,6 +764,107 @@ async function fetchAnimeGif(category: string): Promise<{ url: string; animeName
   }
 }
 
+const SOCIAL_GIF_PREFIX = "social:gif:";
+const SOCIAL_GIF_COUNT = 6;
+const SOCIAL_GIF_TTL_MS = 15 * 60_000;
+
+interface GifCarouselState {
+  ownerId: string;
+  urls: string[];
+  index: number;
+  expiresAt: number;
+}
+
+const gifCarousels = new Map<string, GifCarouselState>();
+
+async function fetchAnimeGifs(category: string): Promise<string[]> {
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  for (let attempt = 0; urls.length < SOCIAL_GIF_COUNT && attempt < SOCIAL_GIF_COUNT * 3; attempt += 1) {
+    const gif = await fetchAnimeGif(category);
+    if (!gif || seen.has(gif.url)) continue;
+    urls.push(gif.url);
+    seen.add(gif.url);
+  }
+  return urls;
+}
+
+function rememberGifCarousel(messageId: string, ownerId: string, urls: string[]): void {
+  const now = Date.now();
+  for (const [key, carousel] of gifCarousels) {
+    if (carousel.expiresAt <= now) gifCarousels.delete(key);
+  }
+  while (gifCarousels.size >= 500) {
+    const oldestKey = gifCarousels.keys().next().value;
+    if (!oldestKey) break;
+    gifCarousels.delete(oldestKey);
+  }
+  gifCarousels.set(messageId, {
+    ownerId,
+    urls,
+    index: 0,
+    expiresAt: now + SOCIAL_GIF_TTL_MS,
+  });
+}
+
+function buildSocialComponents(
+  messageId: string,
+  gifCount: number,
+  extraButtons: ButtonBuilder[] = [],
+): ActionRowBuilder<ButtonBuilder>[] {
+  if (gifCount < 2 && extraButtons.length === 0) return [];
+  const row = new ActionRowBuilder<ButtonBuilder>();
+  if (gifCount >= 2) {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${SOCIAL_GIF_PREFIX}${messageId}`)
+        .setLabel("Next GIF")
+        .setStyle(ButtonStyle.Secondary),
+    );
+  }
+  row.addComponents(...extraButtons);
+  return [row];
+}
+
+async function replyWithSocialEmbed(
+  message: Message,
+  embed: EmbedBuilder,
+  gifUrls: string[],
+  extraButtons: ButtonBuilder[] = [],
+): Promise<void> {
+  await message.reply({
+    embeds: [embed],
+    components: buildSocialComponents(message.id, gifUrls.length, extraButtons),
+    allowedMentions: { parse: [], repliedUser: false },
+  });
+  if (gifUrls.length > 1) rememberGifCarousel(message.id, message.author.id, gifUrls);
+}
+
+export async function handleSocialGifButton(interaction: ButtonInteraction): Promise<void> {
+  const messageId = interaction.customId.slice(SOCIAL_GIF_PREFIX.length);
+  const carousel = gifCarousels.get(messageId);
+  if (!carousel || carousel.expiresAt <= Date.now()) {
+    gifCarousels.delete(messageId);
+    await interaction.reply({ content: "This GIF picker has expired.", ephemeral: true });
+    return;
+  }
+  if (interaction.user.id !== carousel.ownerId) {
+    await interaction.reply({ content: "Only the person who ran this command can change its GIF.", ephemeral: true });
+    return;
+  }
+
+  const embed = interaction.message.embeds[0];
+  if (!embed) {
+    await interaction.reply({ content: "This message has no embed to update.", ephemeral: true });
+    return;
+  }
+  const nextIndex = (carousel.index + 1) % carousel.urls.length;
+  await interaction.update({
+    embeds: [EmbedBuilder.from(embed).setThumbnail(carousel.urls[nextIndex]!)],
+  });
+  carousel.index = nextIndex;
+}
+
 export async function handleSocialAction(message: Message, actionName: SocialActionName): Promise<void> {
   if (!message.guild) return;
   if (!(await canUseSocialCommands(message))) return;
@@ -747,63 +893,55 @@ export async function handleSocialAction(message: Message, actionName: SocialAct
     if (actionName === "aura") {
       const score = dailyScore("aura", target.id, -1000, 1000);
       const mood = auraMood(score);
-      const gif = await fetchAnimeGif(mood.gifCategory);
-      await message.reply({
-        embeds: [buildAuraCard(
+      const gifUrls = await fetchAnimeGifs(mood.gifCategory);
+      await replyWithSocialEmbed(
+        message,
+        buildAuraCard(
           safeDisplayName(target.displayName),
           score,
           avatarUrl,
-          gif?.url,
-        )],
-        allowedMentions: { parse: [], repliedUser: false },
-      });
+          gifUrls[0],
+        ),
+        gifUrls,
+      );
       return;
     }
 
+    const gifUrls = await fetchAnimeGifs(action.gifCategory);
     const embed = buildScoreCard(
       actionName,
       safeDisplayName(target.displayName),
       target.id,
       avatarUrl,
+      gifUrls[0],
     );
-    await message.reply({
-      embeds: [embed],
-      allowedMentions: { parse: [], repliedUser: false },
-    });
+    await replyWithSocialEmbed(message, embed, gifUrls);
     return;
   }
 
-  const gif = await fetchAnimeGif(action.gifCategory);
+  const gifUrls = await fetchAnimeGifs(action.gifCategory);
   const actorName = safeDisplayName(message.member?.displayName ?? message.author.username);
   const targetName = safeDisplayName(target.displayName);
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
-    .setDescription(
-      `${action.render(actorName, targetName, target.id)}${gif ? "" : "\n\n🎞️ Anime GIF is temporarily unavailable."}`,
-    )
-    .setFooter({ text: "Just for fun — keep it friendly." });
+    .setDescription(action.render(actorName, targetName, target.id));
 
-  if (gif) embed.setImage(gif.url);
+  if (gifUrls[0]) embed.setThumbnail(gifUrls[0]);
 
-  const components: ActionRowBuilder<ButtonBuilder>[] = [];
+  const extraButtons: ButtonBuilder[] = [];
   if (supportsBackButton(actionName) && target.id !== message.author.id && !target.user.bot) {
     const customId = `${SOCIAL_BACK_PREFIX}${actionName}:${message.author.id}:${target.id}`;
     if (customId.length <= 100) {
-      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      extraButtons.push(
         new ButtonBuilder()
           .setCustomId(customId)
           .setLabel(BACK_LABELS[actionName] ?? "Send back")
           .setStyle(ButtonStyle.Primary),
       );
-      components.push(row);
     }
   }
 
-  await message.reply({
-    embeds: [embed],
-    ...(components.length > 0 ? { components } : {}),
-    allowedMentions: { parse: [], repliedUser: false },
-  });
+  await replyWithSocialEmbed(message, embed, gifUrls, extraButtons);
 }
 
 export async function handleSocialBackButton(interaction: ButtonInteraction): Promise<void> {
@@ -873,18 +1011,17 @@ export async function handleSocialBackButton(interaction: ButtonInteraction): Pr
       await interaction.deferReply();
 
       const action = SOCIAL_ACTIONS[actionName];
-      const gif = await fetchAnimeGif(action.gifCategory);
+      const gifUrls = await fetchAnimeGifs(action.gifCategory);
       const embed = new EmbedBuilder()
         .setColor(0x2b2d31)
         .setDescription(
-          `${action.render(
+          action.render(
             safeDisplayName(clicker.displayName),
             safeDisplayName(original.displayName),
             original.id,
-          )}${gif ? "" : "\n\n🎞️ Anime GIF is temporarily unavailable."}`,
-        )
-        .setFooter({ text: "Just for fun — keep it friendly." });
-      if (gif) embed.setImage(gif.url);
+          ),
+        );
+      if (gifUrls[0]) embed.setThumbnail(gifUrls[0]);
 
       // Remove the button from the original message so it can only be used once.
       await interaction.message.edit({ components: [] }).catch((err) => {
@@ -893,8 +1030,10 @@ export async function handleSocialBackButton(interaction: ButtonInteraction): Pr
 
       await interaction.editReply({
         embeds: [embed],
+        components: buildSocialComponents(interaction.id, gifUrls.length),
         allowedMentions: { parse: [] },
       });
+      if (gifUrls.length > 1) rememberGifCarousel(interaction.id, clicker.id, gifUrls);
     } finally {
       pendingBackMessageIds.delete(interaction.message.id);
     }
@@ -962,34 +1101,18 @@ export async function handleShip(message: Message): Promise<void> {
             ? "A chaotic duo, but an iconic one."
             : "Opposites attract; the memes are guaranteed.";
 
+    const gif = await fetchAnimeGif("handhold");
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
-    .setAuthor({ name: "MAINZ MATCHMAKER  •  PAIR REPORT" })
     .setTitle("💘 Compatibility check")
-    .setDescription(`**${safeDisplayName(firstMember.displayName)}**  ×  **${safeDisplayName(secondMember.displayName)}**`)
-    .addFields(
-      { name: "CHEMISTRY", value: `**${score}%**\n${meter}`, inline: true },
-      { name: "PAIR VIBE", value: verdict, inline: true },
-    )
-    .setFooter({ text: "A playful pairing score • Not a real compatibility prediction" })
-    .setTimestamp();
-
-  let files: AttachmentBuilder[] = [];
-  try {
-    const image = await renderShipImage(
-      firstUser.displayAvatarURL({ extension: "png", size: 128 }),
-      secondUser.displayAvatarURL({ extension: "png", size: 128 }),
-      score,
+    .setDescription(
+      `**${safeDisplayName(firstMember.displayName)}** × **${safeDisplayName(secondMember.displayName)}**\n` +
+      `**${score}%** ${meter}\n${verdict}`,
     );
-    files = [new AttachmentBuilder(image, { name: "ship.png" })];
-    embed.setImage("attachment://ship.png");
-  } catch (err) {
-    logger.error({ err }, "Failed to render ship image; sending text-only embed");
-  }
+  if (gif) embed.setThumbnail(gif.url);
 
   await message.reply({
     embeds: [embed],
-    files,
     allowedMentions: { parse: [], repliedUser: false },
   });
 }

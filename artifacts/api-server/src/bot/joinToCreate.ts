@@ -242,6 +242,7 @@ async function createTempChannel(
           allow: [
             PermissionFlagsBits.ViewChannel,
             PermissionFlagsBits.Connect,
+            PermissionFlagsBits.Speak,
           ],
         },
         {
@@ -249,6 +250,7 @@ async function createTempChannel(
           allow: [
             PermissionFlagsBits.ViewChannel,
             PermissionFlagsBits.Connect,
+            PermissionFlagsBits.Speak,
             PermissionFlagsBits.ManageChannels,
             PermissionFlagsBits.MoveMembers,
           ],
