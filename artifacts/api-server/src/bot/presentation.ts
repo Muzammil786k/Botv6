@@ -7,6 +7,7 @@ import {
 } from "discord.js";
 import { and, eq } from "drizzle-orm";
 import { botEmbedOverridesTable, db } from "@workspace/db";
+import { SOCIAL_ACTION_NAMES } from "./social";
 
 const FOOTER_TEXT = "Use /help to see all commands";
 const BRAND_COLOR = 0x2b2d31;
@@ -26,14 +27,23 @@ function asApiEmbed(value: unknown): APIEmbed {
   return value as APIEmbed;
 }
 
-function brandEmbed(value: unknown, user: ClientUser | null, fallbackText: string): EmbedBuilder {
+function brandEmbed(
+  value: unknown,
+  user: ClientUser | null,
+  fallbackText: string,
+  suppressFooter = false,
+): EmbedBuilder {
   const data = asApiEmbed(value);
   const embed = EmbedBuilder.from(data).setColor(BRAND_COLOR);
 
-  const existingFooter = data.footer?.text?.trim();
-  const footerText = existingFooter || FOOTER_TEXT;
-  const footerIcon = user?.displayAvatarURL({ size: 64 }) ?? data.footer?.icon_url;
-  embed.setFooter(footerIcon ? { text: footerText, iconURL: footerIcon } : { text: footerText });
+  if (suppressFooter) {
+    embed.setFooter(null);
+  } else {
+    const existingFooter = data.footer?.text?.trim();
+    const footerText = existingFooter || FOOTER_TEXT;
+    const footerIcon = user?.displayAvatarURL({ size: 64 }) ?? data.footer?.icon_url;
+    embed.setFooter(footerIcon ? { text: footerText, iconURL: footerIcon } : { text: footerText });
+  }
   return embed;
 }
 
@@ -91,6 +101,7 @@ function styleReplyPayload(
   user: ClientUser | null,
   clearExistingContent = false,
   override: Awaited<ReturnType<typeof loadEmbedOverride>> = null,
+  suppressFooter = false,
 ): unknown {
   if (typeof payload !== "string" && (!payload || typeof payload !== "object")) {
     return payload;
@@ -104,9 +115,11 @@ function styleReplyPayload(
   const existingEmbeds = Array.isArray(options.embeds) ? options.embeds : [];
 
   if (existingEmbeds.length > 0) {
-    options.embeds = existingEmbeds.map((embed) =>
-      applyEmbedOverride(brandEmbed(embed, user, content), override),
-    );
+    options.embeds = existingEmbeds.map((embed) => {
+      const styled = applyEmbedOverride(brandEmbed(embed, user, content, suppressFooter), override);
+      if (suppressFooter) styled.setFooter(null);
+      return styled;
+    });
     return options;
   }
 
@@ -114,14 +127,18 @@ function styleReplyPayload(
     const iconURL = user?.displayAvatarURL({ size: 64 });
     const embed = new EmbedBuilder()
       .setColor(BRAND_COLOR)
-      .setDescription(content.slice(0, 4096))
-      .setFooter(iconURL ? { text: FOOTER_TEXT, iconURL } : { text: FOOTER_TEXT });
+      .setDescription(content.slice(0, 4096));
+    if (!suppressFooter) {
+      embed.setFooter(iconURL ? { text: FOOTER_TEXT, iconURL } : { text: FOOTER_TEXT });
+    }
     if (clearExistingContent) {
       options.content = null;
     } else {
       delete options.content;
     }
-    options.embeds = [applyEmbedOverride(embed, override)];
+    const styled = applyEmbedOverride(embed, override);
+    if (suppressFooter) styled.setFooter(null);
+    options.embeds = [styled];
   }
 
   return options;
@@ -151,11 +168,13 @@ async function styleChannelPayload(
 export function withPremiumReplies(message: Message, user: ClientUser | null): Message {
   const commandKey = commandKeyFromMessage(message);
   const guildId = message.guildId;
+  const suppressFooter = commandKey === "afk" || commandKey === "ship" ||
+    (commandKey !== null && SOCIAL_ACTION_NAMES.includes(commandKey as (typeof SOCIAL_ACTION_NAMES)[number]));
   const style = async (payload: unknown, clearExistingContent = false) => {
     const override = guildId && commandKey
       ? await getEmbedOverride(guildId, commandKey)
       : null;
-    return styleReplyPayload(payload, user, clearExistingContent, override);
+    return styleReplyPayload(payload, user, clearExistingContent, override, suppressFooter);
   };
   const wrap = (target: Message): Message =>
     new Proxy(target, {

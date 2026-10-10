@@ -9,7 +9,7 @@ import { handleMessage } from "./commands";
 import { handleAfkInteraction } from "./afk";
 import { handleEmbedInteraction } from "./embeds";
 import { handleSlashCommand, registerSlashCommands } from "./slash";
-import { handleSocialBackButton, handleSocialGifButton } from "./social";
+import { handleSocialBackButton } from "./social";
 import { giveaways, buildGiveawayEmbed } from "./giveaway";
 import { handleJtcInteraction, handleVoiceStateUpdate } from "./joinToCreate";
 import { handleTicketInteraction } from "./tickets";
@@ -85,14 +85,6 @@ export function createBot(): Client {
     }
     if (interaction.isButton() && interaction.customId.startsWith("social:back:")) {
       await handleSocialBackButton(interaction);
-      return;
-    }
-    if (interaction.isButton() && interaction.customId.startsWith("social:gif:")) {
-      try {
-        await handleSocialGifButton(interaction);
-      } catch (err) {
-        logger.error({ err, customId: interaction.customId }, "Error handling social GIF carousel");
-      }
       return;
     }
     if (interaction.isButton() && interaction.customId.startsWith("afk:dm:")) {

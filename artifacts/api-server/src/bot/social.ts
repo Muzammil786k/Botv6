@@ -491,12 +491,19 @@ function buildScoreCard(
   const filledBlocks = Math.round(((score - minimum) / (maximum - minimum)) * 12);
   const meter = `${"▰".repeat(filledBlocks)}${"▱".repeat(12 - filledBlocks)}`;
 
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
     .setAuthor({ name: targetName, iconURL: avatarUrl })
     .setTitle(SOCIAL_ACTIONS[actionName].title)
-    .setDescription(`**${scoreLabel}**\n${meter}\n${reading}`)
-    .setThumbnail(gifUrl ?? avatarUrl);
+    .setDescription(`Today's reading for **${targetName}**`)
+    .addFields(
+      { name: "SCORE", value: `**${scoreLabel}**\n${meter}`, inline: true },
+      { name: "READING", value: reading, inline: true },
+    )
+    .setTimestamp();
+
+  if (gifUrl) embed.setImage(gifUrl);
+  return embed;
 }
 
 function auraMood(score: number): { color: number; title: string; reading: string; gifCategory: string } {
@@ -555,10 +562,9 @@ function buildAuraCard(
     .setTitle(`✨ ${mood.title}`)
     .setDescription(
       `**${score >= 0 ? "+" : ""}${score.toLocaleString()} aura**  ${meter}\n${mood.reading}`,
-    )
-    .setFooter({ text: "Daily score • Just for fun" });
+    );
 
-  if (gifUrl) embed.setThumbnail(gifUrl);
+  if (gifUrl) embed.setImage(gifUrl);
 
   return embed;
 }
@@ -764,105 +770,18 @@ async function fetchAnimeGif(category: string): Promise<{ url: string; animeName
   }
 }
 
-const SOCIAL_GIF_PREFIX = "social:gif:";
-const SOCIAL_GIF_COUNT = 6;
-const SOCIAL_GIF_TTL_MS = 15 * 60_000;
-
-interface GifCarouselState {
-  ownerId: string;
-  urls: string[];
-  index: number;
-  expiresAt: number;
-}
-
-const gifCarousels = new Map<string, GifCarouselState>();
-
-async function fetchAnimeGifs(category: string): Promise<string[]> {
-  const urls: string[] = [];
-  const seen = new Set<string>();
-  for (let attempt = 0; urls.length < SOCIAL_GIF_COUNT && attempt < SOCIAL_GIF_COUNT * 3; attempt += 1) {
-    const gif = await fetchAnimeGif(category);
-    if (!gif || seen.has(gif.url)) continue;
-    urls.push(gif.url);
-    seen.add(gif.url);
-  }
-  return urls;
-}
-
-function rememberGifCarousel(messageId: string, ownerId: string, urls: string[]): void {
-  const now = Date.now();
-  for (const [key, carousel] of gifCarousels) {
-    if (carousel.expiresAt <= now) gifCarousels.delete(key);
-  }
-  while (gifCarousels.size >= 500) {
-    const oldestKey = gifCarousels.keys().next().value;
-    if (!oldestKey) break;
-    gifCarousels.delete(oldestKey);
-  }
-  gifCarousels.set(messageId, {
-    ownerId,
-    urls,
-    index: 0,
-    expiresAt: now + SOCIAL_GIF_TTL_MS,
-  });
-}
-
-function buildSocialComponents(
-  messageId: string,
-  gifCount: number,
-  extraButtons: ButtonBuilder[] = [],
-): ActionRowBuilder<ButtonBuilder>[] {
-  if (gifCount < 2 && extraButtons.length === 0) return [];
-  const row = new ActionRowBuilder<ButtonBuilder>();
-  if (gifCount >= 2) {
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`${SOCIAL_GIF_PREFIX}${messageId}`)
-        .setLabel("Next GIF")
-        .setStyle(ButtonStyle.Secondary),
-    );
-  }
-  row.addComponents(...extraButtons);
-  return [row];
-}
-
 async function replyWithSocialEmbed(
   message: Message,
   embed: EmbedBuilder,
-  gifUrls: string[],
   extraButtons: ButtonBuilder[] = [],
 ): Promise<void> {
   await message.reply({
     embeds: [embed],
-    components: buildSocialComponents(message.id, gifUrls.length, extraButtons),
+    ...(extraButtons.length > 0
+      ? { components: [new ActionRowBuilder<ButtonBuilder>().addComponents(...extraButtons)] }
+      : {}),
     allowedMentions: { parse: [], repliedUser: false },
   });
-  if (gifUrls.length > 1) rememberGifCarousel(message.id, message.author.id, gifUrls);
-}
-
-export async function handleSocialGifButton(interaction: ButtonInteraction): Promise<void> {
-  const messageId = interaction.customId.slice(SOCIAL_GIF_PREFIX.length);
-  const carousel = gifCarousels.get(messageId);
-  if (!carousel || carousel.expiresAt <= Date.now()) {
-    gifCarousels.delete(messageId);
-    await interaction.reply({ content: "This GIF picker has expired.", ephemeral: true });
-    return;
-  }
-  if (interaction.user.id !== carousel.ownerId) {
-    await interaction.reply({ content: "Only the person who ran this command can change its GIF.", ephemeral: true });
-    return;
-  }
-
-  const embed = interaction.message.embeds[0];
-  if (!embed) {
-    await interaction.reply({ content: "This message has no embed to update.", ephemeral: true });
-    return;
-  }
-  const nextIndex = (carousel.index + 1) % carousel.urls.length;
-  await interaction.update({
-    embeds: [EmbedBuilder.from(embed).setThumbnail(carousel.urls[nextIndex]!)],
-  });
-  carousel.index = nextIndex;
 }
 
 export async function handleSocialAction(message: Message, actionName: SocialActionName): Promise<void> {
@@ -893,40 +812,40 @@ export async function handleSocialAction(message: Message, actionName: SocialAct
     if (actionName === "aura") {
       const score = dailyScore("aura", target.id, -1000, 1000);
       const mood = auraMood(score);
-      const gifUrls = await fetchAnimeGifs(mood.gifCategory);
+      const gif = await fetchAnimeGif(mood.gifCategory);
       await replyWithSocialEmbed(
         message,
         buildAuraCard(
           safeDisplayName(target.displayName),
           score,
           avatarUrl,
-          gifUrls[0],
+          gif?.url,
         ),
-        gifUrls,
       );
       return;
     }
 
-    const gifUrls = await fetchAnimeGifs(action.gifCategory);
+    const gif = await fetchAnimeGif(action.gifCategory);
     const embed = buildScoreCard(
       actionName,
       safeDisplayName(target.displayName),
       target.id,
       avatarUrl,
-      gifUrls[0],
+      gif?.url,
     );
-    await replyWithSocialEmbed(message, embed, gifUrls);
+    await replyWithSocialEmbed(message, embed);
     return;
   }
 
-  const gifUrls = await fetchAnimeGifs(action.gifCategory);
+  const gif = await fetchAnimeGif(action.gifCategory);
   const actorName = safeDisplayName(message.member?.displayName ?? message.author.username);
   const targetName = safeDisplayName(target.displayName);
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
+    .setTitle(action.title)
     .setDescription(action.render(actorName, targetName, target.id));
 
-  if (gifUrls[0]) embed.setThumbnail(gifUrls[0]);
+  if (gif) embed.setImage(gif.url);
 
   const extraButtons: ButtonBuilder[] = [];
   if (supportsBackButton(actionName) && target.id !== message.author.id && !target.user.bot) {
@@ -941,7 +860,7 @@ export async function handleSocialAction(message: Message, actionName: SocialAct
     }
   }
 
-  await replyWithSocialEmbed(message, embed, gifUrls, extraButtons);
+  await replyWithSocialEmbed(message, embed, extraButtons);
 }
 
 export async function handleSocialBackButton(interaction: ButtonInteraction): Promise<void> {
@@ -1011,9 +930,10 @@ export async function handleSocialBackButton(interaction: ButtonInteraction): Pr
       await interaction.deferReply();
 
       const action = SOCIAL_ACTIONS[actionName];
-      const gifUrls = await fetchAnimeGifs(action.gifCategory);
+      const gif = await fetchAnimeGif(action.gifCategory);
       const embed = new EmbedBuilder()
         .setColor(0x2b2d31)
+        .setTitle(action.title)
         .setDescription(
           action.render(
             safeDisplayName(clicker.displayName),
@@ -1021,7 +941,7 @@ export async function handleSocialBackButton(interaction: ButtonInteraction): Pr
             original.id,
           ),
         );
-      if (gifUrls[0]) embed.setThumbnail(gifUrls[0]);
+      if (gif) embed.setImage(gif.url);
 
       // Remove the button from the original message so it can only be used once.
       await interaction.message.edit({ components: [] }).catch((err) => {
@@ -1030,10 +950,8 @@ export async function handleSocialBackButton(interaction: ButtonInteraction): Pr
 
       await interaction.editReply({
         embeds: [embed],
-        components: buildSocialComponents(interaction.id, gifUrls.length),
         allowedMentions: { parse: [] },
       });
-      if (gifUrls.length > 1) rememberGifCarousel(interaction.id, clicker.id, gifUrls);
     } finally {
       pendingBackMessageIds.delete(interaction.message.id);
     }
@@ -1109,7 +1027,7 @@ export async function handleShip(message: Message): Promise<void> {
       `**${safeDisplayName(firstMember.displayName)}** × **${safeDisplayName(secondMember.displayName)}**\n` +
       `**${score}%** ${meter}\n${verdict}`,
     );
-  if (gif) embed.setThumbnail(gif.url);
+  if (gif) embed.setImage(gif.url);
 
   await message.reply({
     embeds: [embed],
