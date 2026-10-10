@@ -1,7 +1,8 @@
 import {
   EmbedBuilder,
   ActionRowBuilder,
-  ComponentType,
+  ButtonBuilder,
+  ButtonStyle,
   StringSelectMenuBuilder,
   type Message,
 } from "discord.js";
@@ -10,19 +11,20 @@ import { premiumColors, premiumEmbed } from "./presentation";
 
 const C = premiumColors.brand;
 const TIMEOUT = 5 * 60_000;
-const HELP_FOOTER = "MAINZ • Select a category below to browse commands";
+const HELP_FOOTER = "Choose a category or browse with Previous/Next";
 const CATEGORIES = [
-  { label: "Start & Giveaways", value: "start", description: "Help and giveaway commands" },
-  { label: "Moderation", value: "moderation", description: "Warnings, timeouts, kicks, and bans" },
-  { label: "Server Controls", value: "controls", description: "Roles, channels, and announcements" },
-  { label: "Automation", value: "automation", description: "Auto-reactions, sticky, and welcome" },
-  { label: "Server & Utility", value: "utility", description: "Server info, members, and bot tools" },
-  { label: "Games", value: "games", description: "Word Bomb and game commands" },
-  { label: "Economy", value: "economy", description: "Browse and buy server roles" },
-  { label: "Social: Friendly", value: "friendly", description: "Hugs, cheers, compliments, and more" },
-  { label: "Social: Affection", value: "affection", description: "Cute and affectionate reactions" },
-  { label: "Social: Reactions", value: "reactions", description: "Anime reactions and playful actions" },
-  { label: "Scores & Ships", value: "scores", description: "Aura, rizz, ratings, and ship checks" },
+  { label: "🏠 Bot Overview", value: "home", description: "Main bot modules and quick start" },
+  { label: "🧭 Start & Giveaways", value: "start", description: "Help and giveaway commands" },
+  { label: "🛡️ Moderation", value: "moderation", description: "Warnings, timeouts, kicks, and bans" },
+  { label: "⚙️ Server Controls", value: "controls", description: "Roles, channels, and announcements" },
+  { label: "📡 Automation", value: "automation", description: "Auto-reactions, sticky, and welcome" },
+  { label: "🧰 Server & Utility", value: "utility", description: "Server info, members, and bot tools" },
+  { label: "🎮 Games", value: "games", description: "Word Bomb and game commands" },
+  { label: "💰 Economy", value: "economy", description: "Browse and buy server roles" },
+  { label: "💛 Social: Friendly", value: "friendly", description: "Hugs, cheers, compliments, and more" },
+  { label: "💞 Social: Affection", value: "affection", description: "Cute and affectionate reactions" },
+  { label: "✨ Social: Reactions", value: "reactions", description: "Anime reactions and playful actions" },
+  { label: "📊 Scores & Ships", value: "scores", description: "Aura, rizz, ratings, and ship checks" },
 ] as const;
 type CategoryId = (typeof CATEGORIES)[number]["value"];
 
@@ -33,6 +35,47 @@ function helpPage(title: string): EmbedBuilder {
     .setTitle(title)
     .setFooter({ text: HELP_FOOTER })
     .setTimestamp();
+}
+
+function pageHome(): EmbedBuilder {
+  return helpPage("🏠 Bot Overview")
+    .setDescription("A complete command center for your server, community, and games.")
+    .addFields(
+      {
+        name: "🛡️ Safety & Moderation",
+        value: "Warnings, timeouts, bans, AutoMod, and channel controls.",
+        inline: true,
+      },
+      {
+        name: "⚙️ Server Setup",
+        value: "Roles, tickets, voice channels, and server configuration.",
+        inline: true,
+      },
+      {
+        name: "📡 Automation",
+        value: "Welcome messages, sticky posts, and automatic reactions.",
+        inline: true,
+      },
+      {
+        name: "🎉 Giveaways & Economy",
+        value: "Giveaways, credits, hourly work, drops, and role shop.",
+        inline: true,
+      },
+      {
+        name: "🎮 Games & Social",
+        value: "Word Bomb, social actions, daily scores, and ships.",
+        inline: true,
+      },
+      {
+        name: "🧰 Utilities",
+        value: "Member, server, channel, and bot information.",
+        inline: true,
+      },
+      {
+        name: "🚀 Quick Start",
+        value: "Use `!command` or `/command`. Pick a category below or browse page by page.",
+      },
+    );
 }
 
 function page1(): EmbedBuilder {
@@ -75,8 +118,8 @@ function page3(): EmbedBuilder {
   return helpPage("⚙️ Server Controls")
     .addFields(
       { name: "`!noprefix @role` • `/noprefix`", value: "Let a role use commands without `!`; use `remove` to disable it.\n*(Manage Server)*" },
-      { name: "`!socialrole set @role` • `/socialrole set`", value: "Require a server role to use social actions like `!kiss` and `!hug`. Check `status` or clear with `remove|clear|off`.\n*(Manage Server)*" },
-      { name: "`!role @user @role` • `/role`", value: "Add or remove a role from a member.\n*(Manage Roles)*" },
+      { name: "`!socialrole set @role1 @role2...` • `/socialrole set`", value: "Require any one of several server roles to use social actions like `!kiss` and `!hug`. Check `status` or clear with `remove|clear|off`.\n*(Manage Server)*" },
+      { name: "`!role @user @role|Role Name` • `/role`", value: "Add or remove a role using its mention or exact name (including spaces).\n*(Manage Roles)*" },
       { name: "`!nick @user <name|reset>` • `/nick`", value: "Change or reset a member nickname.\n*(Manage Nicknames)*" },
       { name: "`!announce #channel <message>` • `/announce`", value: "Send an announcement embed to a channel.\n*(Manage Server)*" },
       { name: "`!embed`", value: "Create named embeds with title, description, hex color, images, thumbnails, footer and fields; preview with `show` and post with `send`. Customize command-response embeds separately with `!embed override`; reset with `override-reset`.\n*(Manage Server)*" },
@@ -130,8 +173,8 @@ function page5(): EmbedBuilder {
       { name: "`!wbstop` / `!wordbomb stop` • `/wbstop`", value: "Stop the current Word Bomb game.\n*(Manage Server)*" },
       { name: "`!wbtop` • `/wbtop`", value: "Show the Word Bomb win leaderboard for this server." },
       { name: "✅ **Command notes**", value: "Slash commands appear server-by-server after the bot starts. Prefix commands continue to work as before.\n\nFor accurate online/offline presence counts, enable **Server Members Intent** and **Presence Intent** in the Discord Developer Portal." },
-      { name: "💳 **Credits**", value: "Check your balance with `!credit`. Earn **20 credits** from chat once per minute, or win **38 Reputation** in a 30-minute reaction drop. Reputation is added to your credit balance; spend it on server roles with `!shop` and `!shop buy @role`." },
-      { name: "🦉 **Credit drops**", value: "An Epic reaction drop appears every **30 minutes**. The first 🌦️ reaction wins **38 Reputation**, added to the winner's credit balance. Server managers set the channel with `!creditdrop setup #channel`; change the interval with `!creditdrop interval 1h` (30m–24h). Check, pause, or resume with `!creditdrop status|pause|resume`." },
+      { name: "💳 **Credits**", value: "Check your balance with `!credit`. Earn **20 credits** from chat once per minute, **20 credits** with `!work` once per hour, or **30 credits** in a reaction drop. Spend credits on server roles with `!shop` and `!shop buy @role`." },
+      { name: "🦉 **Credit drops**", value: "An Epic reaction drop appears every **30 minutes**. The first 🌦️ reaction wins **30 credits**, added to the winner's balance. Server managers set the channel with `!creditdrop setup #channel`; change the interval with `!creditdrop interval 1h` (30m–24h). Check, pause, or resume with `!creditdrop status|pause|resume`." },
     )
     .setFooter({ text: HELP_FOOTER });
 }
@@ -170,6 +213,7 @@ const AFFECTION_ACTIONS: SocialActionName[] = [
 ];
 const REACTION_ACTIONS: SocialActionName[] = [
   "kill",
+  "fight",
   "slap",
   "poke",
   "bonk",
@@ -210,7 +254,7 @@ function socialCategory(
     .setColor(C)
     .setAuthor({ name: "MAINZ  •  COMMAND CENTER" })
     .setTitle(`📖 Help • ${title}`)
-    .setDescription("Prefix and slash commands do the same thing. Social commands can be role-restricted with `!socialrole set @role`.")
+    .setDescription("Prefix and slash commands do the same thing. Social commands can be role-restricted with `!socialrole set @role1 @role2`.")
     .addFields(...fields)
     .setFooter({ text: HELP_FOOTER });
 }
@@ -230,6 +274,7 @@ function scoresCategory(): EmbedBuilder {
 }
 
 const CATEGORY_BUILDERS: Record<CategoryId, () => EmbedBuilder> = {
+  home: pageHome,
   start: page1,
   moderation: page2,
   controls: page3,
@@ -258,16 +303,51 @@ function buildCategoryRow(selected: CategoryId) {
   return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
 }
 
+function buildNavigationRow(selected: CategoryId) {
+  const selectedIndex = CATEGORIES.findIndex((category) => category.value === selected);
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId("help:previous")
+      .setLabel("Previous")
+      .setEmoji("◀️")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(selectedIndex <= 0),
+    new ButtonBuilder()
+      .setCustomId("help:next")
+      .setLabel("Next")
+      .setEmoji("▶️")
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(selectedIndex >= CATEGORIES.length - 1),
+  );
+}
+
+function buildHelpComponents(selected: CategoryId) {
+  return [buildCategoryRow(selected), buildNavigationRow(selected)];
+}
+
+function buildCategoryEmbed(category: CategoryId, message: Message): EmbedBuilder {
+  const pageIndex = CATEGORIES.findIndex((item) => item.value === category);
+  const embed = CATEGORY_BUILDERS[category]();
+  const avatarUrl = message.client.user?.displayAvatarURL({ size: 64 });
+  embed.setAuthor({
+    name: "MAINZ  •  COMMAND CENTER",
+    ...(avatarUrl ? { iconURL: avatarUrl } : {}),
+  });
+  embed.setFooter({
+    text: `PAGE ${pageIndex + 1} / ${CATEGORIES.length}  •  ${HELP_FOOTER}`,
+  });
+  return embed;
+}
+
 export async function handleHelp(message: Message): Promise<void> {
-  let currentCategory: CategoryId = "start";
+  let currentCategory: CategoryId = "home";
 
   const helpMsg = await message.reply({
-    embeds: [CATEGORY_BUILDERS[currentCategory]()],
-    components: [buildCategoryRow(currentCategory)],
+    embeds: [buildCategoryEmbed(currentCategory, message)],
+    components: buildHelpComponents(currentCategory),
   });
 
   const collector = helpMsg.createMessageComponentCollector({
-    componentType: ComponentType.StringSelect,
     time: TIMEOUT,
   });
 
@@ -286,16 +366,24 @@ export async function handleHelp(message: Message): Promise<void> {
       return;
     }
 
-    const selected = CATEGORIES.find((category) => category.value === interaction.values[0]);
-    if (!selected) {
+    let nextCategory: CategoryId | undefined;
+    if (interaction.isStringSelectMenu()) {
+      nextCategory = CATEGORIES.find((category) => category.value === interaction.values[0])?.value;
+    } else if (interaction.isButton()) {
+      const currentIndex = CATEGORIES.findIndex((category) => category.value === currentCategory);
+      const nextIndex = currentIndex + (interaction.customId === "help:next" ? 1 : -1);
+      nextCategory = CATEGORIES[nextIndex]?.value;
+    }
+
+    if (!nextCategory) {
       await interaction.deferUpdate();
       return;
     }
 
-    currentCategory = selected.value;
+    currentCategory = nextCategory;
     await interaction.update({
-      embeds: [CATEGORY_BUILDERS[currentCategory]()],
-      components: [buildCategoryRow(currentCategory)],
+      embeds: [buildCategoryEmbed(currentCategory, message)],
+      components: buildHelpComponents(currentCategory),
     });
   });
 

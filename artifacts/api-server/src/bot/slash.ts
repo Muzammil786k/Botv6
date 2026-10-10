@@ -104,12 +104,16 @@ const slashCommands = [
     .addBooleanOption((o) => o.setName("remove").setDescription("Remove the current no-prefix role")),
   new SlashCommandBuilder()
     .setName("socialrole")
-    .setDescription("Set the role required to use social commands.")
+    .setDescription("Set one or more roles required to use social commands.")
     .addSubcommand((sub) =>
       sub
         .setName("set")
-        .setDescription("Require a role for social commands.")
-        .addRoleOption((o) => o.setName("role").setDescription("Role required to use social commands").setRequired(true)),
+        .setDescription("Require any one of these roles for social commands.")
+        .addRoleOption((o) => o.setName("role").setDescription("Required role").setRequired(true))
+        .addRoleOption((o) => o.setName("role2").setDescription("Additional accepted role"))
+        .addRoleOption((o) => o.setName("role3").setDescription("Additional accepted role"))
+        .addRoleOption((o) => o.setName("role4").setDescription("Additional accepted role"))
+        .addRoleOption((o) => o.setName("role5").setDescription("Additional accepted role")),
     )
     .addSubcommand((sub) =>
       sub.setName("status").setDescription("Show the current social-command role requirement."),
@@ -324,8 +328,12 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
     case "socialrole": {
       const action = interaction.options.getSubcommand(false) ?? "status";
       if (action !== "set") return `!socialrole ${action}`;
-      const role = interaction.options.getRole("role");
-      return role ? `!socialrole set <@&${role.id}>` : "!socialrole status";
+      const roles = ["role", "role2", "role3", "role4", "role5"]
+        .map((name) => interaction.options.getRole(name))
+        .filter((role): role is Role => role !== null);
+      return roles.length
+        ? `!socialrole set ${roles.map((role) => `<@&${role.id}>`).join(" ")}`
+        : "!socialrole status";
     }
     case "voice":
       return `!voice ${interaction.options.getSubcommand(false) ?? "help"}`;

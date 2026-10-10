@@ -248,10 +248,21 @@ export async function handleRole(message: Message): Promise<void> {
   }
 
   const target = message.mentions.members?.first();
-  const role = message.mentions.roles.first();
+  let role = message.mentions.roles.first();
+  if (!role) {
+    const roleName = message.content.trim().split(/\s+/).slice(2).join(" ").replace(/^['"]|['"]$/g, "").trim();
+    const matches = message.guild.roles.cache.filter(
+      (candidate) => candidate.name.toLocaleLowerCase() === roleName.toLocaleLowerCase(),
+    );
+    if (matches.size === 1) role = matches.first() ?? null;
+    else if (matches.size > 1) {
+      await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription("❌ Multiple roles have that name. Please mention the role instead.")] });
+      return;
+    }
+  }
 
   if (!target || !role) {
-    await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription("❌ Usage: `!role @user @role`")] });
+    await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription("❌ Usage: `!role @user @role` or `!role @user Role Name`")] });
     return;
   }
 

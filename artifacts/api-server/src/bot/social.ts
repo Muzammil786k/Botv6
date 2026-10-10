@@ -56,8 +56,15 @@ export const SOCIAL_ACTIONS = {
     description: "Pretend to defeat a member in a silly game.",
     title: "🎮 Game over!",
     help: "Pretend to defeat someone in a harmless game-style showdown.",
-    gifCategory: "yeet",
+    gifCategory: "shoot",
     render: (actor, target) => `${actor} defeats ${target} in a silly game-style showdown. Respawn in 3… 2… 1!`,
+  },
+  fight: {
+    description: "Have a playful cartoon sparring match with a member.",
+    title: "🥊 Playful spar!",
+    help: "Start a silly, harmless cartoon sparring match.",
+    gifCategory: "punch",
+    render: (actor, target) => `${actor} starts a goofy cartoon spar with ${target}. Winner gets bragging rights!`,
   },
   slap: {
     description: "Give a member a light cartoon-style slap.",
@@ -494,7 +501,6 @@ function buildScoreCard(
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
     .setAuthor({ name: targetName, iconURL: avatarUrl })
-    .setTitle(SOCIAL_ACTIONS[actionName].title)
     .setDescription(`Today's reading for **${targetName}**`)
     .addFields(
       { name: "SCORE", value: `**${scoreLabel}**\n${meter}`, inline: true },
@@ -559,7 +565,6 @@ function buildAuraCard(
   const embed = new EmbedBuilder()
     .setColor(mood.color)
     .setAuthor({ name: `${targetName}'s daily aura`, iconURL: avatarUrl })
-    .setTitle(`✨ ${mood.title}`)
     .setDescription(
       `**${score >= 0 ? "+" : ""}${score.toLocaleString()} aura**  ${meter}\n${mood.reading}`,
     );
@@ -585,6 +590,7 @@ const NON_INTERACTION_ACTIONS: ReadonlySet<string> = new Set([
 ]);
 const BACK_LABELS: Partial<Record<SocialActionName, string>> = {
   hug: "Hug back 🫂",
+  fight: "Fight back 🥊",
   kiss: "Kiss back 😘",
   pat: "Pat back 🐾",
   slap: "Slap back 🖐️",
@@ -598,6 +604,7 @@ const BACK_LABELS: Partial<Record<SocialActionName, string>> = {
 };
 const BACK_NOUNS: Partial<Record<SocialActionName, string>> = {
   hug: "hug",
+  fight: "fight",
   kiss: "kiss",
   pat: "pat",
   slap: "slap",
@@ -649,7 +656,7 @@ const RELATED_GIF_CATEGORIES: Record<string, string[]> = {
   highfive: ["highfive", "clap", "wave", "dance"],
   hug: ["hug", "cuddle", "pat", "handhold"],
   kick: ["kick", "yeet", "punch", "slap"],
-  kiss: ["kiss", "handhold", "blush", "cuddle"],
+  kiss: ["kiss"],
   laugh: ["laugh", "smile", "happy", "shrug"],
   nom: ["nom", "feed", "bite", "happy"],
   pat: ["pat", "boop", "hug", "cuddle"],
@@ -657,6 +664,7 @@ const RELATED_GIF_CATEGORIES: Record<string, string[]> = {
   pout: ["pout", "blush", "cry", "smile"],
   punch: ["punch", "slap", "kick", "bonk"],
   shrug: ["shrug", "facepalm", "stare", "think"],
+  shoot: ["shoot"],
   slap: ["slap", "punch", "bonk", "kick"],
   smile: ["smile", "happy", "wink", "wave"],
   smug: ["smug", "stare", "wink", "think"],
@@ -842,7 +850,6 @@ export async function handleSocialAction(message: Message, actionName: SocialAct
   const targetName = safeDisplayName(target.displayName);
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
-    .setTitle(action.title)
     .setDescription(action.render(actorName, targetName, target.id));
 
   if (gif) embed.setImage(gif.url);
@@ -933,7 +940,6 @@ export async function handleSocialBackButton(interaction: ButtonInteraction): Pr
       const gif = await fetchAnimeGif(action.gifCategory);
       const embed = new EmbedBuilder()
         .setColor(0x2b2d31)
-        .setTitle(action.title)
         .setDescription(
           action.render(
             safeDisplayName(clicker.displayName),
@@ -1022,7 +1028,6 @@ export async function handleShip(message: Message): Promise<void> {
     const gif = await fetchAnimeGif("handhold");
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
-    .setTitle("💘 Compatibility check")
     .setDescription(
       `**${safeDisplayName(firstMember.displayName)}** × **${safeDisplayName(secondMember.displayName)}**\n` +
       `**${score}%** ${meter}\n${verdict}`,

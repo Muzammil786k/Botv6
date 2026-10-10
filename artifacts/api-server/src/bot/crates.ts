@@ -21,7 +21,7 @@ const MAX_INTERVAL_MINUTES = 24 * 60;
 const CRATE_LIFETIME_MS = 10 * 60_000;
 const SCHEDULER_INTERVAL_MS = 30_000;
 const REACTION = "🌦️";
-const CREDIT_REWARD = 38;
+const CREDIT_REWARD = 30;
 
 let scheduler: NodeJS.Timeout | undefined;
 let schedulerRunning = false;
@@ -31,8 +31,12 @@ function creditDropEmbed(expiresAt: number): EmbedBuilder {
     .setColor(0x9b59b6)
     .setTitle("Credit Drop!")
     .setDescription(
-      `React with ${REACTION} first to win **${CREDIT_REWARD} Reputation**.\n` +
-      `Expires <t:${Math.floor(expiresAt / 1000)}:R>`,
+      `<:click:1558393065616707674> **React** to this message with the emoji below to win!\n\n` +
+      `<:reaction:1558393068254666785>  **Reaction:** ${REACTION}\n` +
+      "<:trophy:1558393071224365102>  **First valid reaction wins!**\n\n" +
+      "<:epic:1558393073204076607> **Rarity:** Epic\n" +
+      `<:reward:1558393075829702726> **Reward:** ${CREDIT_REWARD} Credits\n` +
+      `<:time:1558393079851917372> **Expires:** <t:${Math.floor(expiresAt / 1000)}:R>`,
     );
 }
 
@@ -343,7 +347,7 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
           .setColor(0x9b59b6)
           .setTitle("Credit Drop Claimed!")
           .setDescription(
-            `**+${result.credits} Reputation**\nBalance: **${result.balance.toLocaleString()} credits**`,
+            `**+${result.credits} Credits**\nBalance: **${result.balance.toLocaleString()} credits**`,
           ),
       ],
       allowedMentions: { users: [user.id] },
