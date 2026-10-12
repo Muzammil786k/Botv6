@@ -40,6 +40,7 @@ export async function handleAfk(message: Message, transformedContent?: string): 
     const away = formatDuration(Date.now() - entry.since);
     afkUsers.delete(userId);
     await message.reply({
+      suppressHelpFooter: true,
       embeds: [
         new EmbedBuilder()
           .setColor(0xff0000)
@@ -60,6 +61,7 @@ export async function handleAfk(message: Message, transformedContent?: string): 
     const since = Date.now();
     afkUsers.set(userId, { status, since, dmOnMention: false });
     await message.reply({
+      suppressHelpFooter: true,
       embeds: [
         new EmbedBuilder()
           .setColor(0xff0000)
@@ -91,6 +93,7 @@ export async function handleAfk(message: Message, transformedContent?: string): 
       const entry = afkUsers.get(mentionedUser.id)!;
       const away = formatDuration(Date.now() - entry.since);
       await message.reply({
+        suppressHelpFooter: true,
         embeds: [
           new EmbedBuilder()
             .setColor(0xff0000)
@@ -132,7 +135,8 @@ export async function handleAfkInteraction(interaction: ButtonInteraction): Prom
   }
 
   entry.dmOnMention = choice === "yes";
-  await interaction.update({ components: [] });
+  await interaction.deferUpdate();
+  await interaction.message.edit({ components: [] });
   await interaction.followUp({
     content: entry.dmOnMention
       ? "You'll get a DM when someone mentions you while AFK."

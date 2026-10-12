@@ -11,11 +11,12 @@ import { handleEmbedInteraction } from "./embeds";
 import { handleSlashCommand, registerSlashCommands } from "./slash";
 import { handleSocialBackButton } from "./social";
 import { giveaways, buildGiveawayEmbed } from "./giveaway";
-import { handleJtcInteraction, handleVoiceStateUpdate } from "./joinToCreate";
+import { handleJtcInteraction, handleVoiceStateUpdate, startTempChannelCleanupScheduler } from "./joinToCreate";
 import { handleTicketInteraction } from "./tickets";
 import { logger } from "../lib/logger";
 import { processUserMessageAutomations, sendMemberMessage } from "./automation";
 import { handleCreditDropReaction, startCreditDropScheduler } from "./crates";
+import { handleCreditAirdropButton, startCreditAirdropScheduler } from "./creditAirdrop";
 
 export function createBot(): Client {
   const token = process.env["DISCORD_BOT_TOKEN"];
@@ -40,6 +41,8 @@ export function createBot(): Client {
     logger.info({ tag: client.user?.tag }, "Discord bot is ready");
     client.user?.setActivity("🎉 Giveaways | !help | /help");
     startCreditDropScheduler(client);
+    startCreditAirdropScheduler(client);
+    startTempChannelCleanupScheduler(client);
     void registerSlashCommands(client);
   });
 
@@ -85,6 +88,14 @@ export function createBot(): Client {
     }
     if (interaction.isButton() && interaction.customId.startsWith("social:back:")) {
       await handleSocialBackButton(interaction);
+      return;
+    }
+    if (interaction.isButton() && interaction.customId.startsWith("creditairdrop:join:")) {
+      try {
+        await handleCreditAirdropButton(interaction);
+      } catch (err) {
+        logger.error({ err, customId: interaction.customId }, "Error handling credit airdrop entry");
+      }
       return;
     }
     if (interaction.isButton() && interaction.customId.startsWith("afk:dm:")) {

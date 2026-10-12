@@ -18,7 +18,7 @@ import {
   type VoiceState,
 } from "discord.js";
 import { eq } from "drizzle-orm";
-import { db, botJoinToCreateTable } from "@workspace/db";
+import { db, botJoinToCreateTable, botJtcTempChannelsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { premiumColors } from "./presentation";
 
@@ -79,8 +79,26 @@ async function removeJtcConfig(guildId: string): Promise<boolean> {
   return deleted.length > 0;
 }
 
-// Temporary channels created by the bot, mapped channelId -> ownerId. State is in-memory only.
+// Cache persisted temporary-channel ownership for command interactions.
 const tempChannels = new Map<string, string>();
+const pendingChannelCleanup = new Map<string, NodeJS.Timeout>();
+const channelCleanupInProgress = new Set<string>();
+
+async function persistTempChannel(channelId: string, guildId: string, ownerId: string): Promise<void> {
+  await db.insert(botJtcTempChannelsTable)
+    .values({ channelId, guildId, ownerId })
+    .onConflictDoUpdate({
+      target: botJtcTempChannelsTable.channelId,
+      set: { guildId, ownerId },
+    });
+  tempChannels.set(channelId, ownerId);
+}
+
+async function forgetTempChannel(channelId: string): Promise<void> {
+  await db.delete(botJtcTempChannelsTable)
+    .where(eq(botJtcTempChannelsTable.channelId, channelId));
+  tempChannels.delete(channelId);
+}
 
 const JTC_PREFIX = "jtc:";
 const RENAME_MODAL_ID = "jtc:rename_modal";
@@ -203,11 +221,14 @@ function getClaimError(channel: VoiceChannel, userId: string): string | null {
 
 async function performClaim(channel: VoiceChannel, userId: string): Promise<void> {
   const ownerId = tempChannels.get(channel.id);
-  tempChannels.set(channel.id, userId);
   try {
     await transferOwnership(channel, userId, ownerId ?? userId);
+    await persistTempChannel(channel.id, channel.guild.id, userId);
   } catch (err) {
-    if (ownerId) tempChannels.set(channel.id, ownerId);
+    if (ownerId) {
+      await transferOwnership(channel, ownerId, userId).catch(() => {});
+      tempChannels.set(channel.id, ownerId);
+    }
     throw err;
   }
 }
@@ -257,12 +278,12 @@ async function createTempChannel(
         },
       ],
     });
-    tempChannels.set(created.id, member.id);
+    await persistTempChannel(created.id, newState.guild.id, member.id);
 
     // The member may have left the lobby while the channel was being created.
     if (member.voice.channelId !== lobby.id) {
-      tempChannels.delete(created.id);
       await created.delete("Join to Create: member left before being moved");
+      await forgetTempChannel(created.id);
       return;
     }
 
@@ -291,8 +312,9 @@ async function createTempChannel(
   } catch (err) {
     logger.error({ err, guildId: newState.guild.id, userId: member.id }, "Failed to create join-to-create channel");
     if (created) {
-      tempChannels.delete(created.id);
-      await created.delete("Join to Create: failed to move member").catch((deleteErr) => {
+      await created.delete("Join to Create: failed to move member").then(() => {
+        return forgetTempChannel(created!.id);
+      }).catch((deleteErr) => {
         logger.error({ err: deleteErr, channelId: created?.id }, "Failed to clean up join-to-create channel");
       });
     }
@@ -301,39 +323,100 @@ async function createTempChannel(
   }
 }
 
-async function cleanupTempChannel(oldState: VoiceState): Promise<void> {
-  const channel = oldState.channel;
-  if (!channel || !tempChannels.has(channel.id)) return;
+async function cleanupTempChannel(guild: Guild, channelId: string): Promise<void> {
+  if (channelCleanupInProgress.has(channelId)) return;
+  channelCleanupInProgress.add(channelId);
 
-  if (channel.members.size !== 0) {
-    // The owner left but others remain: hand the channel to the first remaining member.
-    const ownerId = tempChannels.get(channel.id);
-    if (!ownerId || channel.members.has(ownerId) || channel.type !== ChannelType.GuildVoice) return;
+  try {
+    let ownerId = tempChannels.get(channelId);
+    if (!ownerId) {
+      const [tracked] = await db.select({ ownerId: botJtcTempChannelsTable.ownerId })
+        .from(botJtcTempChannelsTable)
+        .where(eq(botJtcTempChannelsTable.channelId, channelId))
+        .limit(1);
+      ownerId = tracked?.ownerId;
+      if (!ownerId) return;
+      tempChannels.set(channelId, ownerId);
+    }
 
-    const nextOwner = channel.members.find((m) => !m.user.bot);
-    if (!nextOwner) return;
+    const channel = guild.channels.cache.get(channelId) ?? await guild.channels.fetch(channelId).catch(() => null);
+    if (!channel || channel.type !== ChannelType.GuildVoice) {
+      await forgetTempChannel(channelId);
+      return;
+    }
 
-    tempChannels.set(channel.id, nextOwner.id);
-    try {
-      await transferOwnership(channel, nextOwner.id, ownerId);
+    const occupants = guild.voiceStates.cache.filter((state) => state.channelId === channelId);
+    if (occupants.size > 0) {
+      if (guild.voiceStates.cache.get(ownerId)?.channelId === channelId) return;
+
+      const nextOwner = channel.members.find((member) => !member.user.bot);
+      if (!nextOwner) return;
+      const previousOwnerId = ownerId;
+      await transferOwnership(channel, nextOwner.id, previousOwnerId);
+      await persistTempChannel(channelId, guild.id, nextOwner.id);
       logger.info(
-        { guildId: oldState.guild.id, channelId: channel.id, ownerId: nextOwner.id },
+        { guildId: guild.id, channelId, ownerId: nextOwner.id },
         "Transferred join-to-create channel ownership",
       );
-      await channel.send({ content: `👑 <@${nextOwner.id}> is now the owner of this channel.` });
-    } catch (err) {
-      logger.error({ err, guildId: oldState.guild.id, channelId: channel.id }, "Failed to transfer join-to-create ownership");
+      await channel.send({ content: `👑 <@${nextOwner.id}> is now the owner of this channel.` }).catch(() => {});
+      return;
     }
-    return;
-  }
 
-  tempChannels.delete(channel.id);
-  try {
     await channel.delete("Join to Create: channel is empty");
-    logger.info({ guildId: oldState.guild.id, channelId: channel.id }, "Deleted empty join-to-create channel");
+    await forgetTempChannel(channelId);
+    logger.info({ guildId: guild.id, channelId }, "Deleted empty join-to-create channel");
   } catch (err) {
-    logger.error({ err, guildId: oldState.guild.id, channelId: channel.id }, "Failed to delete join-to-create channel");
+    logger.error({ err, guildId: guild.id, channelId }, "Failed to clean up join-to-create channel; it will be retried");
+    const priorTimer = pendingChannelCleanup.get(channelId);
+    if (priorTimer) clearTimeout(priorTimer);
+    const retryTimer = setTimeout(() => {
+      pendingChannelCleanup.delete(channelId);
+      void cleanupTempChannel(guild, channelId);
+    }, 10_000);
+    retryTimer.unref();
+    pendingChannelCleanup.set(channelId, retryTimer);
+  } finally {
+    channelCleanupInProgress.delete(channelId);
   }
+}
+
+function scheduleTempChannelCleanup(guild: Guild, channelId: string, delayMs = 1_500): void {
+  const priorTimer = pendingChannelCleanup.get(channelId);
+  if (priorTimer) clearTimeout(priorTimer);
+
+  const timer = setTimeout(() => {
+    pendingChannelCleanup.delete(channelId);
+    void cleanupTempChannel(guild, channelId);
+  }, delayMs);
+  timer.unref();
+  pendingChannelCleanup.set(channelId, timer);
+}
+
+let tempChannelCleanupScheduler: NodeJS.Timeout | undefined;
+
+export function startTempChannelCleanupScheduler(client: Client): void {
+  if (tempChannelCleanupScheduler) return;
+  tempChannelCleanupScheduler = setInterval(() => {
+    void db.select({ guildId: botJtcTempChannelsTable.guildId, channelId: botJtcTempChannelsTable.channelId })
+      .from(botJtcTempChannelsTable)
+      .then(async (channels) => {
+        for (const tracked of channels) {
+          const guild = client.guilds.cache.get(tracked.guildId);
+          if (guild) await cleanupTempChannel(guild, tracked.channelId);
+        }
+      })
+      .catch((err) => logger.error({ err }, "Join to Create cleanup sweep failed"));
+  }, 30_000);
+  tempChannelCleanupScheduler.unref();
+  void db.select({ guildId: botJtcTempChannelsTable.guildId, channelId: botJtcTempChannelsTable.channelId })
+    .from(botJtcTempChannelsTable)
+    .then(async (channels) => {
+      for (const tracked of channels) {
+        const guild = client.guilds.cache.get(tracked.guildId);
+        if (guild) scheduleTempChannelCleanup(guild, tracked.channelId, 0);
+      }
+    })
+    .catch((err) => logger.error({ err }, "Initial Join to Create cleanup sweep failed"));
 }
 
 function resolveTempChannel(interaction: ButtonInteraction | ModalSubmitInteraction): VoiceChannel | null {
@@ -711,7 +794,7 @@ export async function handleVcCommand(message: Message, args: string[]): Promise
         return;
       }
       await transferOwnership(channel, target.id, message.author.id);
-      tempChannels.set(channel.id, target.id);
+      await persistTempChannel(channel.id, guild.id, target.id);
       await message.reply(`👑 Ownership transferred to <@${target.id}>.`);
       return;
     }
@@ -1075,7 +1158,7 @@ async function handleJtcTransferSubmit(interaction: ModalSubmitInteraction): Pro
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   await transferOwnership(channel, targetMember.id, interaction.user.id);
-  tempChannels.set(channel.id, targetMember.id);
+  await persistTempChannel(channel.id, guild.id, targetMember.id);
   await interaction.editReply({ content: `👑 Ownership transferred to <@${targetMember.id}>.` });
 }
 
@@ -1084,14 +1167,13 @@ export async function handleVoiceStateUpdate(
   oldState: VoiceState,
   newState: VoiceState,
 ): Promise<void> {
-  // Ignore events caused by the bot itself, and by other bots.
   const member = newState.member ?? oldState.member;
-  if (!member || member.user.bot || member.id === client.user?.id) return;
+  if (!member) return;
 
   if (oldState.channelId === newState.channelId) return;
 
   // Guild config (set with !jtc) takes priority; env vars are the fallback.
-  if (newState.channelId) {
+  if (newState.channelId && !member.user.bot && member.id !== client.user?.id) {
     const config = await getJtcConfig(newState.guild.id);
     if (config && newState.channelId === config.lobbyId) {
       await createTempChannel(client, newState, config);
@@ -1099,6 +1181,6 @@ export async function handleVoiceStateUpdate(
   }
 
   if (oldState.channelId && oldState.channelId !== newState.channelId) {
-    await cleanupTempChannel(oldState);
+    scheduleTempChannelCleanup(oldState.guild, oldState.channelId);
   }
 }

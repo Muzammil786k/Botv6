@@ -122,6 +122,21 @@ const slashCommands = [
       sub.setName("remove").setDescription("Allow everyone to use social commands again."),
     ),
   new SlashCommandBuilder()
+    .setName("modrole")
+    .setDescription("Restrict warning and timeout commands to a role.")
+    .addSubcommand((sub) =>
+      sub
+        .setName("set")
+        .setDescription("Choose the role allowed to warn and timeout members.")
+        .addRoleOption((o) => o.setName("role").setDescription("Authorized moderator role").setRequired(true)),
+    )
+    .addSubcommand((sub) =>
+      sub.setName("status").setDescription("Show the configured moderation role."),
+    )
+    .addSubcommand((sub) =>
+      sub.setName("remove").setDescription("Remove the configured moderation role."),
+    ),
+  new SlashCommandBuilder()
     .setName("voice")
     .setDescription("Manage your Join to Create voice channel.")
     .addSubcommand((sub) => sub.setName("help").setDescription("Show custom voice channel commands.")),
@@ -148,6 +163,14 @@ const slashCommands = [
     .setName("avatar")
     .setDescription("Show a member's avatar.")
     .addUserOption((o) => o.setName("user").setDescription("Optional member")),
+  new SlashCommandBuilder()
+    .setName("quote")
+    .setDescription("Create a black quote card using your avatar.")
+    .addStringOption((o) => o.setName("text").setDescription("Quote text").setMaxLength(450).setRequired(true)),
+  new SlashCommandBuilder()
+    .setName("setquote")
+    .setDescription("Choose the channel where quote cards can be created.")
+    .addChannelOption((o) => o.setName("channel").setDescription("Quote text channel").addChannelTypes(ChannelType.GuildText).setRequired(true)),
   new SlashCommandBuilder()
     .setName("role")
     .setDescription("Add or remove a role.")
@@ -237,7 +260,15 @@ const slashCommands = [
     ),
   new SlashCommandBuilder()
     .setName("wordbomb")
-    .setDescription("Start a Word Bomb game."),
+    .setDescription("Start a Word Bomb game in the configured games channel."),
+  new SlashCommandBuilder()
+    .setName("truthordare")
+    .setDescription("Play Truth or Dare in the configured games channel.")
+    .addUserOption((o) => o.setName("user").setDescription("Player who chooses Truth or Dare")),
+  new SlashCommandBuilder()
+    .setName("setgame")
+    .setDescription("Choose the channel where server games can be played.")
+    .addChannelOption((o) => o.setName("channel").setDescription("Games text channel").addChannelTypes(ChannelType.GuildText).setRequired(true)),
   new SlashCommandBuilder()
     .setName("wbstop")
     .setDescription("Stop the current Word Bomb game."),
@@ -245,8 +276,15 @@ const slashCommands = [
     .setName("wbtop")
     .setDescription("Show the Word Bomb leaderboard."),
   new SlashCommandBuilder()
-    .setName("work")
-    .setDescription("Work to earn 20 credits. Available once per hour."),
+    .setName("airdrop")
+    .setDescription("Create a timed credit airdrop for server members.")
+    .addSubcommand((sub) =>
+      sub
+        .setName("create")
+        .setDescription("Start an airdrop; entrants split the credits equally.")
+        .addIntegerOption((option) => option.setName("credits").setDescription("Total credits in the airdrop").setMinValue(1).setRequired(true))
+        .addStringOption((option) => option.setName("duration").setDescription("How long it stays open, e.g. 10m or 1h").setMaxLength(8).setRequired(true)),
+    ),
   new SlashCommandBuilder()
     .setName("ship")
     .setDescription("Get a playful compatibility score for two members.")
@@ -335,6 +373,20 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
         ? `!socialrole set ${roles.map((role) => `<@&${role.id}>`).join(" ")}`
         : "!socialrole status";
     }
+    case "modrole": {
+      const action = interaction.options.getSubcommand(false) ?? "status";
+      if (action !== "set") return `!modrole ${action}`;
+      const role = interaction.options.getRole("role");
+      return role ? `!modrole set <@&${role.id}>` : "!modrole status";
+    }
+    case "setgame": {
+      const channel = interaction.options.getChannel("channel");
+      return channel ? `!setgame <#${channel.id}>` : "!setgame status";
+    }
+    case "truthordare":
+      return `!truthordare ${mentionContent(interaction, "user")}`.trim();
+    case "airdrop":
+      return `!airdrop ${interaction.options.getInteger("credits")} ${string("duration")}`;
     case "voice":
       return `!voice ${interaction.options.getSubcommand(false) ?? "help"}`;
     case "ship":
@@ -343,6 +395,12 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
       return `!userinfo ${mentionContent(interaction, "user")}`.trim();
     case "avatar":
       return `!avatar ${mentionContent(interaction, "user")}`.trim();
+    case "quote":
+      return `!quote ${string("text")}`;
+    case "setquote": {
+      const channel = interaction.options.getChannel("channel");
+      return channel ? `!setquote <#${channel.id}>` : "!setquote status";
+    }
     case "role": {
       const role = interaction.options.getRole("role");
       return `!role ${mentionContent(interaction, "user")} ${role ? `<@&${role.id}>` : ""}`.trim();
@@ -457,7 +515,11 @@ export async function handleSlashCommand(client: Client, interaction: ChatInputC
       return;
     }
 
-    if (Object.hasOwn(SOCIAL_ACTIONS, interaction.commandName) || interaction.commandName === "ship") {
+    if (
+      Object.hasOwn(SOCIAL_ACTIONS, interaction.commandName) ||
+      interaction.commandName === "ship" ||
+      interaction.commandName === "airdrop"
+    ) {
       await interaction.deferReply();
     }
 

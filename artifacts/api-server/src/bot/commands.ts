@@ -24,6 +24,7 @@ import {
   handlePing,
   handleBotInfo,
   handleChannelInfo,
+  handleQuote,
 } from "./utility";
 import { handleShip, handleSocialAction, SOCIAL_ACTIONS, type SocialActionName } from "./social";
 import { handleSteal } from "./steal";
@@ -37,9 +38,14 @@ import { withPremiumReplies } from "./presentation";
 import { handleJtcCommand, handleVcCommand } from "./joinToCreate";
 import { handleTicketCommand } from "./tickets";
 import { handleSocialRoleCommand } from "./socialRole";
+import { handleModerationRoleCommand } from "./moderationRole";
+import { handleSetGameCommand } from "./gameChannel";
+import { handleTruthOrDare } from "./truthordare";
+import { handleSetQuoteCommand } from "./quoteChannel";
 import { handleCreditCommand, handleRoleShopCommand } from "./roleShop";
-import { awardChatCredits, handleWorkCommand } from "./credits";
+import { awardChatCredits } from "./credits";
 import { handleCreditDropCommand } from "./crates";
+import { handleCreditAirdropCommand } from "./creditAirdrop";
 import { handleEmbedCommand } from "./embeds";
 import { logger } from "../lib/logger";
 
@@ -74,6 +80,10 @@ export async function handleMessage(
     await handleCreditDropCommand(message);
     return;
   }
+  if (lower === "!airdrop" || lower.startsWith("!airdrop ")) {
+    await handleCreditAirdropCommand(message, content.split(/\s+/).slice(1));
+    return;
+  }
   if (lower === "!embed" || lower.startsWith("!embed ")) {
     await handleEmbedCommand(message);
     return;
@@ -101,11 +111,13 @@ export async function handleMessage(
   // ── Moderation ────────────────────────────────────────────────────────────
   } else if (lower === "!automod" || lower.startsWith("!automod ")) {
     await handleAutomodCommand(message);
+  } else if (lower === "!modrole" || lower.startsWith("!modrole ")) {
+    await handleModerationRoleCommand(message, content.split(/\s+/).slice(1));
   } else if (lower === "!warn" || lower.startsWith("!warn ")) {
     await handleWarn(message);
   } else if (lower === "!warnings" || lower.startsWith("!warnings ")) {
     await handleWarnings(message);
-  } else if (lower === "!clearwarnings" || lower.startsWith("!clearwarnings ")) {
+  } else if (lower === "!clearwarnings" || lower.startsWith("!clearwarnings ") || lower === "!clearwarn" || lower.startsWith("!clearwarn ")) {
     await handleClearWarnings(message);
   } else if (lower === "!mute" || lower.startsWith("!mute ")) {
     await handleMute(message);
@@ -151,6 +163,10 @@ export async function handleMessage(
     await handleChannelInfo(message);
   } else if (lower === "!avatar" || lower.startsWith("!avatar ")) {
     await handleAvatar(message);
+  } else if (lower === "!quote" || lower.startsWith("!quote ")) {
+    await handleQuote(message);
+  } else if (lower === "!setquote" || lower.startsWith("!setquote ")) {
+    await handleSetQuoteCommand(message, content.split(/\s+/).slice(1));
   } else if (lower === "!role" || lower.startsWith("!role ")) {
     await handleRole(message);
   } else if (lower === "!nick" || lower.startsWith("!nick ")) {
@@ -159,6 +175,10 @@ export async function handleMessage(
     await handleAnnounce(message);
 
   // ── Fun / Games ───────────────────────────────────────────────────────────
+  } else if (lower === "!setgame" || lower.startsWith("!setgame ")) {
+    await handleSetGameCommand(message, content.split(/\s+/).slice(1));
+  } else if (lower === "!truthordare" || lower.startsWith("!truthordare ") || lower === "!tod" || lower.startsWith("!tod ")) {
+    await handleTruthOrDare(message);
   } else if (lower === "!wordbomb" || lower === "!wb") {
     await handleWordbomb(client, message);
   } else if (lower === "!wbstop" || lower === "!wordbomb stop") {
@@ -167,8 +187,6 @@ export async function handleMessage(
     await handleWbTop(message);
   } else if (lower === "!credit" || lower === "!credits") {
     await handleCreditCommand(message);
-  } else if (lower === "!work") {
-    await handleWorkCommand(message);
   } else if (lower === "!shop" || lower.startsWith("!shop ")) {
     const args = content.split(/\s+/).slice(1);
     await handleRoleShopCommand(message, args);

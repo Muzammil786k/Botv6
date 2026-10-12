@@ -397,9 +397,10 @@ export async function sendMemberMessage(
     return;
   }
 
-  const customEmbedName = kind === "welcome"
-    ? /^\{\{embed:([a-z0-9_-]{1,32})\}\}$/i.exec(template)?.[1]?.toLowerCase()
-    : undefined;
+  const embedToken = kind === "welcome"
+    ? /\{\{?embed:([a-z0-9_-]{1,32})\}\}?/i.exec(template)
+    : null;
+  const customEmbedName = embedToken?.[1]?.toLowerCase();
   if (customEmbedName) {
     const [custom] = await db
       .select()
@@ -419,6 +420,10 @@ export async function sendMemberMessage(
 
     const render = (value: string, limit: number) =>
       renderMemberTemplate(value, member).slice(0, limit);
+    const greeting = renderMemberTemplate(
+      template.replace(/\{\{?embed:[a-z0-9_-]{1,32}\}\}?/gi, "").trim(),
+      member,
+    );
     const embed = new EmbedBuilder()
       .setTitle(custom.title ? render(custom.title, 256) : `Welcome to ${member.guild.name}`)
       .setThumbnail(custom.thumbnailUrl ?? member.user.displayAvatarURL({ size: 256 }));
@@ -434,6 +439,7 @@ export async function sendMemberMessage(
       })));
     }
     await channel.send({
+      ...(greeting ? { content: greeting } : {}),
       embeds: [embed],
       allowedMentions: { parse: [], users: [member.id] },
     });

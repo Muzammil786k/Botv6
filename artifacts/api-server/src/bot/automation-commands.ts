@@ -69,6 +69,10 @@ async function saveFailure(message: Message, feature: string, error: unknown): P
     .catch(() => {});
 }
 
+function welcomeEmbedName(template: string): string | null {
+  return /\{\{?embed:([a-z0-9_-]{1,32})\}\}?/i.exec(template)?.[1]?.toLowerCase() ?? null;
+}
+
 export async function handleAutoReactCommand(message: Message): Promise<void> {
   if (!message.guild || !(await requireManageServer(message))) return;
 
@@ -358,12 +362,31 @@ async function handleMemberMessageCommand(
     return;
   }
 
+  const embedName = kind === "welcome" ? welcomeEmbedName(template) : null;
+  if (embedName) {
+    const [savedEmbed] = await db
+      .select({ name: botCustomEmbedsTable.name })
+      .from(botCustomEmbedsTable)
+      .where(and(
+        eq(botCustomEmbedsTable.guildId, message.guild.id),
+        eq(botCustomEmbedsTable.name, embedName),
+      ))
+      .limit(1);
+    if (!savedEmbed) {
+      await message.reply({
+        content: `❌ Embed \`${embedName}\` not found. Create it first with \`!embed create ${embedName}\`.`,
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+  }
+
   try {
     await setGuildMessage(message.guild.id, kind, channel.id, template);
     await message.reply({
       content:
         `✅ ${kind === "welcome" ? "Welcome" : "Goodbye"} message set in ${channel}.\n` +
-        "Placeholders `{user}`, `{server}`, and `{memberCount}` will be filled in automatically.",
+        `Placeholders {user}, {server}, and {memberCount} will be filled in automatically.${embedName ? ` Embed \`${embedName}\` will also be included.` : ""}`,
       allowedMentions: { parse: [], repliedUser: false },
     });
   } catch (error) {

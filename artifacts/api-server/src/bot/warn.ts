@@ -1,5 +1,6 @@
 import { EmbedBuilder, PermissionFlagsBits, type Message } from "discord.js";
 import { premiumMessagePayload } from "./presentation";
+import { canUseModerationCommands } from "./moderationRole";
 
 interface Warning {
   reason: string;
@@ -15,14 +16,7 @@ function getKey(guildId: string, userId: string): string {
 
 export async function handleWarn(message: Message): Promise<void> {
   if (!message.guild) return;
-
-  const member = message.guild.members.cache.get(message.author.id);
-  if (!member?.permissions.has(PermissionFlagsBits.ManageGuild)) {
-    await message.reply({
-      embeds: [new EmbedBuilder().setColor(0xff0000).setDescription("❌ You need the **Manage Server** permission to warn members.")],
-    });
-    return;
-  }
+  if (!(await canUseModerationCommands(message))) return;
 
   const args = message.content.trim().split(/\s+/).slice(1);
   if (args.length < 2) {
@@ -132,12 +126,7 @@ export async function handleWarnings(message: Message): Promise<void> {
 
 export async function handleClearWarnings(message: Message): Promise<void> {
   if (!message.guild) return;
-
-  const member = message.guild.members.cache.get(message.author.id);
-  if (!member?.permissions.has(PermissionFlagsBits.ManageGuild)) {
-    await message.reply({ embeds: [new EmbedBuilder().setColor(0xff0000).setDescription("❌ You need the **Manage Server** permission to clear warnings.")] });
-    return;
-  }
+  if (!(await canUseModerationCommands(message))) return;
 
   const args = message.content.trim().split(/\s+/).slice(1);
   const target = message.mentions.members?.first() ?? (args[0] ? message.guild.members.cache.get(args[0]) : null);

@@ -8,6 +8,7 @@ import {
 } from "discord.js";
 import { createRequire } from "node:module";
 import { premiumColors, premiumMessagePayload } from "./presentation";
+import { requireGameChannel } from "./gameChannel";
 
 const _require = createRequire(import.meta.url);
 const _wordList: string[] = _require("an-array-of-english-words");
@@ -249,7 +250,7 @@ async function runGame(channel: TextChannel, state: GameState, guildId: string):
 // ─── Commands ─────────────────────────────────────────────────────────────────
 
 export async function handleWordbomb(client: Client, message: Message): Promise<void> {
-  if (!message.guild) return;
+  if (!message.guild || !(await requireGameChannel(message))) return;
   const guildId = message.guild.id;
 
   if (activeGames.has(guildId)) {
@@ -331,7 +332,7 @@ export async function handleWordbomb(client: Client, message: Message): Promise<
 }
 
 export async function handleWordbombStop(message: Message): Promise<void> {
-  if (!message.guild) return;
+  if (!message.guild || !(await requireGameChannel(message))) return;
   const guildId = message.guild.id;
 
   const member = message.guild.members.cache.get(message.author.id);
@@ -358,7 +359,7 @@ export async function handleWordbombStop(message: Message): Promise<void> {
 }
 
 export async function handleWbTop(message: Message): Promise<void> {
-  if (!message.guild) return;
+  if (!message.guild || !(await requireGameChannel(message))) return;
   const guildId = message.guild.id;
 
   const guildWins = winsLeaderboard.get(guildId);

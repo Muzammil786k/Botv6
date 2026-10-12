@@ -20,20 +20,21 @@ const MIN_INTERVAL_MINUTES = 30;
 const MAX_INTERVAL_MINUTES = 24 * 60;
 const CRATE_LIFETIME_MS = 10 * 60_000;
 const SCHEDULER_INTERVAL_MS = 30_000;
-const REACTION = "🌦️";
+const DROP_REACTIONS = ["🌦️", "🎁", "🍀", "💎", "⭐", "🪙", "🎈", "🍉"] as const;
+const LEGACY_REACTION = "🌦️";
 const MIN_CREDIT_REWARD = 10;
 const MAX_CREDIT_REWARD = 100;
 
 let scheduler: NodeJS.Timeout | undefined;
 let schedulerRunning = false;
 
-function creditDropEmbed(expiresAt: number): EmbedBuilder {
+function creditDropEmbed(expiresAt: number, reaction: string): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(0x9b59b6)
     .setTitle("Credit Drop!")
     .setDescription(
       "<:click:1558393065616707674> **React** to this message with the emoji below to win!\n\n" +
-      `<:reaction:1558393068254666785>  **Reaction:** ${REACTION}\n` +
+      `<:reaction:1558393068254666785>  **Reaction:** ${reaction}\n` +
       "<:trophy:1558393071224365102>  **First valid reaction wins!**\n\n" +
       "<:epic:1558393073204076607> **Rarity:** Epic\n" +
       `<:reward:1558393075829702726> **Reward:** ${MIN_CREDIT_REWARD}–${MAX_CREDIT_REWARD} Credits\n` +
@@ -131,6 +132,7 @@ export async function handleCreditDropCommand(message: Message): Promise<void> {
             nextCrateAt: now + intervalMinutes * 60_000,
             activeMessageId: null,
             activeCreditReward: null,
+            activeReaction: null,
             activeExpiresAt: null,
             updatedAt: new Date(now),
           },
@@ -201,13 +203,15 @@ async function spawnCreditDrop(
   }
   const expiresAt = Date.now() + CRATE_LIFETIME_MS;
   const creditReward = Math.floor(Math.random() * (MAX_CREDIT_REWARD - MIN_CREDIT_REWARD + 1)) + MIN_CREDIT_REWARD;
-  const message = await channel.send({ embeds: [creditDropEmbed(expiresAt)] });
+  const reaction = DROP_REACTIONS[Math.floor(Math.random() * DROP_REACTIONS.length)]!;
+  const message = await channel.send({ embeds: [creditDropEmbed(expiresAt, reaction)] });
   try {
-    await message.react(REACTION);
+    await message.react(reaction);
     await db.update(botCrateSettingsTable)
       .set({
         activeMessageId: message.id,
         activeCreditReward: creditReward,
+        activeReaction: reaction,
         activeExpiresAt: expiresAt,
         updatedAt: new Date(),
       })
@@ -233,6 +237,7 @@ async function runScheduler(client: Client): Promise<void> {
           .set({
             activeMessageId: null,
             activeCreditReward: null,
+            activeReaction: null,
             activeExpiresAt: null,
             updatedAt: new Date(now),
           })
@@ -280,7 +285,7 @@ export function startCreditDropScheduler(client: Client): void {
 }
 
 export async function handleCreditDropReaction(reaction: MessageReaction, user: User): Promise<void> {
-  if (user.bot || reaction.emoji.name !== REACTION) return;
+  if (user.bot) return;
   if (reaction.partial) await reaction.fetch();
   if (reaction.message.partial) await reaction.message.fetch();
   if (!reaction.message.guild) return;
@@ -307,6 +312,8 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
     ) {
       return null;
     }
+    const expectedReaction = settings.activeReaction ?? LEGACY_REACTION;
+    if (reaction.emoji.name !== expectedReaction) return null;
 
     await tx.insert(botMiningProfilesTable)
       .values({ guildId: settings.guildId, userId: user.id })
@@ -332,15 +339,32 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
       .set({
         activeMessageId: null,
         activeCreditReward: null,
+        activeReaction: null,
         activeExpiresAt: null,
         totalCreditDropsClaimed,
         updatedAt: new Date(now),
       })
       .where(eq(botCrateSettingsTable.guildId, settings.guildId));
-    return { credits, balance, totalCreditDropsClaimed };
+    return { credits, balance, totalCreditDropsClaimed, reaction: expectedReaction };
   });
 
   if (!result) return;
+  try {
+    await reaction.message.edit({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x9b59b6)
+          .setDescription(`✅ ${result.reaction} Claimed by <@${user.id}>`),
+      ],
+      allowedMentions: { users: [user.id] },
+    });
+  } catch (error) {
+    logger.error(
+      { err: error, guildId: reaction.message.guild.id, userId: user.id, messageId: reaction.message.id },
+      "Could not compact claimed credit drop",
+    );
+  }
+
   try {
     await reaction.message.reply({
       content: `<@${user.id}>`,

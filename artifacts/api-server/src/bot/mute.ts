@@ -1,4 +1,5 @@
-import { EmbedBuilder, PermissionFlagsBits, type Message } from "discord.js";
+import { EmbedBuilder, type Message } from "discord.js";
+import { canUseModerationCommands } from "./moderationRole";
 
 function parseDuration(input: string): number | null {
   const match = input.match(/^(\d+)(s|m|h|d)$/i);
@@ -11,12 +12,7 @@ function parseDuration(input: string): number | null {
 
 export async function handleMute(message: Message): Promise<void> {
   if (!message.guild) return;
-
-  const member = message.guild.members.cache.get(message.author.id);
-  if (!member?.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-    await message.reply({ embeds: [new EmbedBuilder().setColor(0xff0000).setDescription("❌ You need the **Timeout Members** permission to mute members.")] });
-    return;
-  }
+  if (!(await canUseModerationCommands(message))) return;
 
   const args = message.content.trim().split(/\s+/).slice(1);
   if (args.length < 2) {
@@ -78,12 +74,7 @@ export async function handleMute(message: Message): Promise<void> {
 
 export async function handleUnmute(message: Message): Promise<void> {
   if (!message.guild) return;
-
-  const member = message.guild.members.cache.get(message.author.id);
-  if (!member?.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-    await message.reply({ embeds: [new EmbedBuilder().setColor(0xff0000).setDescription("❌ You need the **Timeout Members** permission to unmute members.")] });
-    return;
-  }
+  if (!(await canUseModerationCommands(message))) return;
 
   const args = message.content.trim().split(/\s+/).slice(1);
   const target = message.mentions.members?.first() ?? (args[0] ? message.guild.members.cache.get(args[0]) : null);

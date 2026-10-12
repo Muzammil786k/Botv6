@@ -1,4 +1,5 @@
 import {
+  AttachmentBuilder,
   EmbedBuilder,
   PermissionFlagsBits,
   type Message,
@@ -6,6 +7,8 @@ import {
   type Client,
 } from "discord.js";
 import { premiumMessagePayload } from "./presentation";
+import { renderQuoteImage } from "./quoteImage";
+import { requireQuoteChannel } from "./quoteChannel";
 
 const C = 0xff0000;
 
@@ -235,6 +238,32 @@ export async function handleAvatar(message: Message): Promise<void> {
         .setDescription(`[Open in browser](${avatarUrl})`),
     ],
   });
+}
+
+export async function handleQuote(message: Message): Promise<void> {
+  if (!message.guild || !(await requireQuoteChannel(message))) return;
+  const quote = message.content.trim().replace(/^!quote\s*/i, "").replace(/^(["'“])([\s\S]*)["'”]$/, "$2").trim();
+  if (!quote) {
+    await message.reply("Usage: `!quote <text>` or `/quote <text>`.");
+    return;
+  }
+
+  try {
+    const image = await renderQuoteImage(
+      message.author.displayAvatarURL({ extension: "png", size: 256 }),
+      message.member?.displayName ?? message.author.displayName,
+      message.author.username,
+      quote,
+    );
+    const attachment = new AttachmentBuilder(image, { name: "quote.png" });
+    await message.reply({
+      embeds: [new EmbedBuilder().setColor(0x000000).setImage("attachment://quote.png")],
+      files: [attachment],
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+  } catch {
+    await message.reply("❌ Could not create the quote image. Please try again.");
+  }
 }
 
 // ─── Role ──────────────────────────────────────────────────────────────────────

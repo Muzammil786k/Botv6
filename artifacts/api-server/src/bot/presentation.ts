@@ -111,13 +111,15 @@ function styleReplyPayload(
     typeof payload === "string"
       ? { content: payload }
       : { ...(payload as Record<string, unknown>) };
+  const omitHelpFooter = suppressFooter || options["suppressHelpFooter"] === true;
+  delete options["suppressHelpFooter"];
   const content = typeof options.content === "string" ? options.content : "";
   const existingEmbeds = Array.isArray(options.embeds) ? options.embeds : [];
 
   if (existingEmbeds.length > 0) {
     options.embeds = existingEmbeds.map((embed) => {
-      const styled = applyEmbedOverride(brandEmbed(embed, user, content, suppressFooter), override);
-      if (suppressFooter) styled.setFooter(null);
+      const styled = applyEmbedOverride(brandEmbed(embed, user, content, omitHelpFooter), override);
+      if (omitHelpFooter) styled.setFooter(null);
       return styled;
     });
     return options;
@@ -128,7 +130,7 @@ function styleReplyPayload(
     const embed = new EmbedBuilder()
       .setColor(BRAND_COLOR)
       .setDescription(content.slice(0, 4096));
-    if (!suppressFooter) {
+    if (!omitHelpFooter) {
       embed.setFooter(iconURL ? { text: FOOTER_TEXT, iconURL } : { text: FOOTER_TEXT });
     }
     if (clearExistingContent) {
@@ -137,7 +139,7 @@ function styleReplyPayload(
       delete options.content;
     }
     const styled = applyEmbedOverride(embed, override);
-    if (suppressFooter) styled.setFooter(null);
+    if (omitHelpFooter) styled.setFooter(null);
     options.embeds = [styled];
   }
 

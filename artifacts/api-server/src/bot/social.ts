@@ -465,15 +465,9 @@ function buildScoreCard(
 
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
-    .setAuthor({ name: targetName, iconURL: avatarUrl })
-    .setDescription(`Today's reading for **${targetName}**`)
-    .addFields(
-      { name: "SCORE", value: `**${scoreLabel}**\n${meter}`, inline: true },
-      { name: "READING", value: reading, inline: true },
-    )
-    .setTimestamp();
+    .setDescription(`**${targetName}** · **${scoreLabel}** ${meter}\n${reading}`)
+    .setThumbnail(gifUrl ?? avatarUrl);
 
-  if (gifUrl) embed.setImage(gifUrl);
   return embed;
 }
 
@@ -529,12 +523,10 @@ function buildAuraCard(
   const meter = `${"▰".repeat(filledBlocks)}${"▱".repeat(8 - filledBlocks)}`;
   const embed = new EmbedBuilder()
     .setColor(mood.color)
-    .setAuthor({ name: `${targetName}'s daily aura`, iconURL: avatarUrl })
     .setDescription(
-      `**${score >= 0 ? "+" : ""}${score.toLocaleString()} aura**  ${meter}\n${mood.reading}`,
-    );
-
-  if (gifUrl) embed.setImage(gifUrl);
+      `**${targetName}** · **${score >= 0 ? "+" : ""}${score.toLocaleString()} aura** ${meter}\n${mood.reading}`,
+    )
+    .setThumbnail(gifUrl ?? avatarUrl);
 
   return embed;
 }
@@ -949,14 +941,14 @@ export async function handleShip(message: Message): Promise<void> {
             ? "A chaotic duo, but an iconic one."
             : "Opposites attract; the memes are guaranteed.";
 
-    const gif = await fetchAnimeGif("handhold");
+  const gif = await fetchAnimeGif("handhold");
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
     .setDescription(
       `**${safeDisplayName(firstMember.displayName)}** × **${safeDisplayName(secondMember.displayName)}**\n` +
       `**${score}%** ${meter}\n${verdict}`,
     );
-  if (gif) embed.setImage(gif.url);
+  if (gif) embed.setThumbnail(gif.url);
 
   await message.reply({
     embeds: [embed],

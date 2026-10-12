@@ -35,10 +35,14 @@ export async function handleCreditCommand(message: Message): Promise<void> {
       ))
       .limit(1);
     const credits = profile?.credits ?? 0;
-    await message.reply(replyEmbed(
-      "Your credits",
-        `You have **${credits.toLocaleString()} credits**. Earn more from chat and credit drops, then spend them in \`!shop\`.`,
-    ));
+    await message.reply({
+      suppressHelpFooter: true,
+      embeds: [
+        new EmbedBuilder()
+          .setColor(EMBED_COLOR)
+          .setDescription(`<:16:1553581538074038372> **${credits.toLocaleString()} credits**`),
+      ],
+    });
   } catch (error) {
     logger.error({ err: error, guildId: guild.id, userId: message.author.id }, "Could not load user credits");
     await message.reply(replyEmbed("Credits unavailable", "I couldn't load your credit balance. Please try again."));

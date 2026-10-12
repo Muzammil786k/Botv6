@@ -94,11 +94,12 @@ function page1(): EmbedBuilder {
 function page2(): EmbedBuilder {
   return helpPage("🛡️ Moderation")
     .addFields(
-      { name: "`!warn @user <reason>` • `/warn`", value: "Warn a member and send them a DM containing the reason.\n*(Manage Server)*" },
+      { name: "`!modrole set @role` • `/modrole set`", value: "Choose the role allowed to use `!warn`, `!clearwarn`, `!mute`, and `!unmute`. Check with `status`; clear with `remove`. *(Manage Server)*" },
+      { name: "`!warn @user <reason>` • `/warn`", value: "Warn a member and DM the reason. Requires the configured moderation role." },
       { name: "`!warnings @user` • `/warnings`", value: "View a member's warnings.\n*(Manage Server)*" },
-      { name: "`!clearwarnings @user` • `/clearwarnings`", value: "Clear all warnings for a member.\n*(Manage Server)*" },
-      { name: "`!mute @user <duration> [reason]` • `/mute`", value: "Timeout a member. `30s` `5m` `2h` `1d`, max 28 days.\n*(Timeout Members)*" },
-      { name: "`!unmute @user` • `/unmute`", value: "Remove a member timeout.\n*(Timeout Members)*" },
+      { name: "`!clearwarn` / `!clearwarnings @user` • `/clearwarnings`", value: "Clear all warnings for a member. Requires the configured moderation role." },
+      { name: "`!mute @user <duration> [reason]` • `/mute`", value: "Timeout a member. `30s` `5m` `2h` `1d`, max 28 days. Requires the configured moderation role." },
+      { name: "`!unmute @user` • `/unmute`", value: "Remove a member timeout. Requires the configured moderation role." },
       { name: "`!kick @user [reason]` • `/kick`", value: "Kick a member.\n*(Kick Members)*" },
       { name: "`!ban @user|<user_id> [reason]` • `/ban`", value: "Ban a server member by mention or Discord user ID; delete their messages from the past 7 days.\n*(Ban Members)*" },
       { name: "`!unban <user_id>` • `/unban`", value: "Unban a user by ID.\n*(Ban Members)*" },
@@ -143,6 +144,8 @@ function page4(): EmbedBuilder {
       { name: "`!botinfo` • `/botinfo`", value: "Show bot tag, server count, latency, and uptime." },
       { name: "`!channelinfo` • `/channelinfo`", value: "Show current channel ID, type, category, and creation time." },
       { name: "`!avatar [@user]` • `/avatar`", value: "Show a member's avatar in high resolution." },
+      { name: "`!quote <text>` • `/quote`", value: "Create a clean black quote card with your avatar, display name, and username." },
+      { name: "`!setquote #channel` • `/setquote channel`", value: "Restrict quote cards to one text channel. Check with `status` or clear with `remove`. *(Manage Server)*" },
       { name: "`!steal` (reply to an emoji or sticker)", value: "Choose to add an emoji or PNG/APNG/GIF sticker from the replied-to message as a server emoji or sticker. Lottie stickers are converted to a still image. Requires **Create Expressions** permission and an available slot." },
     )
     .setFooter({ text: HELP_FOOTER });
@@ -158,8 +161,8 @@ function pageAutomation(): EmbedBuilder {
       { name: "`!sticky set #channel <message>` • `/sticky set`", value: "Keep one branded message at the bottom of a channel. It moves after new messages." },
       { name: "`!sticky status #channel`", value: "Check whether a sticky message is configured in a channel." },
       { name: "`!sticky remove #channel` • `/sticky remove`", value: "Remove the sticky message and stop reposting it." },
-      { name: "`!welcome set #channel <message>` • `/welcome set`", value: "Post a branded text welcome. Use `{user}`, `{server}`, or `{memberCount}`." },
-      { name: "`!welcome embed #channel [name]`", value: "Use a saved custom embed when a member joins. Create/edit it with `!embed create`, `!embed edit`, and preview with `!embed show`. The default embed name is `welcome`; placeholders are supported." },
+      { name: "`!welcome set #channel <message>` • `/welcome set`", value: "Post a branded text welcome. Use `{user}`, `{server}`, or `{memberCount}`. Add `{embed:name}` to include a saved embed with the greeting, e.g. `!welcome set #welcome Welcome {user}! {embed:welcome}`." },
+      { name: "`!welcome embed #channel [name]`", value: "Use a saved custom embed by itself when a member joins. Create/edit it with `!embed create`, `!embed edit`, and preview with `!embed show`. The default embed name is `welcome`; placeholders are supported." },
       { name: "`!welcome remove` • `/welcome remove`", value: "Turn off welcome messages." },
     )
     .setFooter({ text: HELP_FOOTER });
@@ -169,11 +172,13 @@ function page5(): EmbedBuilder {
   return helpPage("🎮 Games")
     .addFields(
       { name: "💣 **Word Bomb**", value: "\u200b" },
-      { name: "`!wordbomb` / `!wb` • `/wordbomb`", value: "Start a Word Bomb game. React ✅ to join.\n**10s** per turn, **3 lives** each. Real English words only!" },
-      { name: "`!wbstop` / `!wordbomb stop` • `/wbstop`", value: "Stop the current Word Bomb game.\n*(Manage Server)*" },
-      { name: "`!wbtop` • `/wbtop`", value: "Show the Word Bomb win leaderboard for this server." },
+      { name: "`!setgame #channel` • `/setgame channel`", value: "Set the one channel where Word Bomb and Truth or Dare can be played. *(Manage Server)*" },
+      { name: "`!wordbomb` / `!wb` • `/wordbomb`", value: "Start a Word Bomb game in the configured games channel. React ✅ to join. **10s** per turn, **3 lives** each. Real English words only!" },
+      { name: "`!wbstop` / `!wordbomb stop` • `/wbstop`", value: "Stop the current Word Bomb game in the configured games channel. *(Manage Server)*" },
+      { name: "`!wbtop` • `/wbtop`", value: "Show the Word Bomb win leaderboard in the configured games channel." },
+      { name: "`!truthordare [@user]` / `!tod` • `/truthordare`", value: "Let a player choose Truth or Dare. Available only in the configured games channel." },
       { name: "✅ **Command notes**", value: "Slash commands appear server-by-server after the bot starts. Prefix commands continue to work as before.\n\nFor accurate online/offline presence counts, enable **Server Members Intent** and **Presence Intent** in the Discord Developer Portal." },
-      { name: "💳 **Credits**", value: "Check your balance with `!credit` or `!credits`. Earn **20 credits** from chat once per minute, **20 credits** with `!work` once per hour, or **10–100 credits** in a reaction drop. Spend credits on server roles with `!shop` and `!shop buy @role`." },
+      { name: "💳 **Credits**", value: "Check your balance with `!credit` or `!credits`. Earn **20 credits** from chat once per minute or **10–100 credits** in a reaction drop. Spend credits on server roles with `!shop` and `!shop buy @role`." },
       { name: "🦉 **Credit drops**", value: "An Epic reaction drop appears every **30 minutes**. The first 🌦️ reaction wins **10–100 random credits**, added to the winner's balance. Server managers set the channel with `!creditdrop setup #channel`; change the interval with `!creditdrop interval 1h` (30m–24h). Check, pause, or resume with `!creditdrop status|pause|resume`." },
     )
     .setFooter({ text: HELP_FOOTER });
@@ -182,7 +187,8 @@ function page5(): EmbedBuilder {
 function pageEconomy(): EmbedBuilder {
   return helpPage("💰 Economy")
     .addFields(
-      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\n`!work` / `/work` — earn **20 credits** once per hour\nChat and credit drops are other ways to earn." },
+      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\nEarn credits through chat and credit drops." },
+      { name: "🎉 **Credit Airdrop**", value: "`!airdrop <credits> <duration>` / `/airdrop create` — start a timed drop with an Enter button. Everyone who joins splits the pot evenly; leftover credits are distributed one each. Example: `!airdrop 200 10m`. *(Manage Server)*" },
       { name: "🏷️ **Role shop**", value: "`!shop` — browse numbered role/price pages\n`!shop buy @role` — buy with credits\n`!shop add @role <price>` — add a listing\n`!shop edit @role <new-price>` — edit its price\n`!shop remove @role` — remove a listing (**Manage Server**)" },
     )
     .setFooter({ text: HELP_FOOTER });
