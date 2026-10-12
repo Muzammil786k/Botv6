@@ -1,16 +1,11 @@
 import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
   EmbedBuilder,
-  type ButtonInteraction,
   type Message,
 } from "discord.js";
 
 interface AfkEntry {
   status: string;
   since: number;
-  dmOnMention: boolean;
 }
 
 const afkUsers = new Map<string, AfkEntry>();
@@ -59,29 +54,13 @@ export async function handleAfk(message: Message, transformedContent?: string): 
   if (isAfkCommand) {
     const status = content.slice(4).trim() || "AFK"; // slice past "!afk"
     const since = Date.now();
-    afkUsers.set(userId, { status, since, dmOnMention: false });
+    afkUsers.set(userId, { status, since });
     await message.reply({
       suppressHelpFooter: true,
       embeds: [
         new EmbedBuilder()
           .setColor(0xff0000)
-          .setDescription(`✅ <@${userId}>: You're now AFK with the status: **${status}**`)
-          .addFields({
-            name: "Should I DM you when someone mentions you while AFK?",
-            value: "Choose Yes or No below.",
-          }),
-      ],
-      components: [
-        new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder()
-            .setCustomId(`afk:dm:yes:${userId}:${since}`)
-            .setLabel("Yes")
-            .setStyle(ButtonStyle.Success),
-          new ButtonBuilder()
-            .setCustomId(`afk:dm:no:${userId}:${since}`)
-            .setLabel("No")
-            .setStyle(ButtonStyle.Secondary),
-        ),
+          .setDescription(`✅ <@${userId}>: You're now AFK with the status: **${status}**`),
       ],
       allowedMentions: { users: [userId] },
     });
@@ -101,48 +80,8 @@ export async function handleAfk(message: Message, transformedContent?: string): 
         ],
         allowedMentions: { users: [] },
       });
-      if (entry.dmOnMention) {
-        const serverName = message.guild?.name ?? "a server";
-        await mentionedUser.send({
-          embeds: [
-            new EmbedBuilder()
-              .setColor(0xff0000)
-              .setTitle("You were mentioned while AFK")
-              .setDescription(
-                `**${message.author.tag}** mentioned you in **${serverName}**.\n[Jump to message](${message.url})`,
-              ),
-          ],
-        }).catch(() => {});
-      }
     }
   }
-}
-
-export async function handleAfkInteraction(interaction: ButtonInteraction): Promise<void> {
-  const match = interaction.customId.match(/^afk:dm:(yes|no):(\d+):(\d+)$/);
-  if (!match) return;
-
-  const [, choice, userId, sessionId] = match;
-  if (interaction.user.id !== userId) {
-    await interaction.reply({ content: "Only the AFK user can choose this.", ephemeral: true });
-    return;
-  }
-
-  const entry = afkUsers.get(userId);
-  if (!entry || String(entry.since) !== sessionId) {
-    await interaction.reply({ content: "This AFK prompt has expired.", ephemeral: true });
-    return;
-  }
-
-  entry.dmOnMention = choice === "yes";
-  await interaction.deferUpdate();
-  await interaction.message.edit({ components: [] });
-  await interaction.followUp({
-    content: entry.dmOnMention
-      ? "You'll get a DM when someone mentions you while AFK."
-      : "AFK mention DMs are turned off.",
-    ephemeral: true,
-  });
 }
 
 export { afkUsers };

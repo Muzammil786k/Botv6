@@ -36,3 +36,4 @@ export * from "./bot-experience-boosts";
 export * from "./bot-tickets";
 export * from "./bot-role-shop";
 export * from "./bot-custom-embeds";
+export * from "./bot-status-roles";

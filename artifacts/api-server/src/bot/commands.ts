@@ -47,6 +47,7 @@ import { awardChatCredits } from "./credits";
 import { handleCreditDropCommand } from "./crates";
 import { handleCreditAirdropCommand } from "./creditAirdrop";
 import { handleEmbedCommand } from "./embeds";
+import { handleStatusRoleCommand } from "./statusRole";
 import { logger } from "../lib/logger";
 
 const PREFIX = "g";
@@ -108,6 +109,8 @@ export async function handleMessage(
     await handleStickyCommand(client, message);
   } else if (lower === "!welcome" || lower.startsWith("!welcome ")) {
     await handleWelcomeCommand(message);
+  } else if (lower === "!statusrole" || lower.startsWith("!statusrole ")) {
+    await handleStatusRoleCommand(message);
   // ── Moderation ────────────────────────────────────────────────────────────
   } else if (lower === "!automod" || lower.startsWith("!automod ")) {
     await handleAutomodCommand(message);

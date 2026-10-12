@@ -36,12 +36,9 @@ export async function handleCreditCommand(message: Message): Promise<void> {
       .limit(1);
     const credits = profile?.credits ?? 0;
     await message.reply({
+      content: `<@${message.author.id}> | <:16:1553581538074038372> You have **${credits.toLocaleString()} credits**`,
       suppressHelpFooter: true,
-      embeds: [
-        new EmbedBuilder()
-          .setColor(EMBED_COLOR)
-          .setDescription(`<:16:1553581538074038372> **${credits.toLocaleString()} credits**`),
-      ],
+      allowedMentions: { users: [] },
     });
   } catch (error) {
     logger.error({ err: error, guildId: guild.id, userId: message.author.id }, "Could not load user credits");
