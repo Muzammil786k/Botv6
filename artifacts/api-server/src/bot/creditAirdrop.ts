@@ -45,7 +45,7 @@ function parseDuration(value: string | undefined): number | null {
 function createAirdropEmbed(totalCredits: number, expiresAt: number, ended = false, entrants = 0): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(premiumColors.brand)
-    .setTitle("💸 Credit Airdrop")
+    .setTitle("<:29:1553581680470532146> Credit Airdrop")
     .setDescription(ended
       ? `<:53:1553581922020499466> **${totalCredits.toLocaleString()} credits** airdrop ended.\nEntries: **${entrants}**`
       : `<:53:1553581922020499466> **${totalCredits.toLocaleString()} credits** up for grabs!\nJoin to split the pot equally. Ends <t:${Math.floor(expiresAt / 1000)}:R>.`);

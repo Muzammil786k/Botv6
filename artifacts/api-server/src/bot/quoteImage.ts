@@ -114,7 +114,7 @@ export async function renderQuoteImage(
   context.font = "bold 32px Arial, sans-serif";
   context.fillText(displayName.slice(0, 48), AVATAR_X, 565);
   context.font = "24px Arial, sans-serif";
-  context.fillStyle = "#bdbdbd";
+  context.fillStyle = "#ffffff";
   context.fillText(`@${username}`.slice(0, 64), AVATAR_X, 605);
 
   return canvas.encode("png");

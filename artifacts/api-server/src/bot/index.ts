@@ -6,7 +6,6 @@ import {
   type User,
 } from "discord.js";
 import { handleMessage } from "./commands";
-import { handleAfkInteraction } from "./afk";
 import { handleEmbedInteraction } from "./embeds";
 import { handleSlashCommand, registerSlashCommands } from "./slash";
 import { handleSocialBackButton } from "./social";
@@ -17,6 +16,7 @@ import { logger } from "../lib/logger";
 import { processUserMessageAutomations, sendMemberMessage } from "./automation";
 import { handleCreditDropReaction, startCreditDropScheduler } from "./crates";
 import { handleCreditAirdropButton, startCreditAirdropScheduler } from "./creditAirdrop";
+import { handleStatusRolePresenceUpdate, handleStatusRoleUserUpdate } from "./statusRole";
 
 export function createBot(): Client {
   const token = process.env["DISCORD_BOT_TOKEN"];
@@ -68,6 +68,18 @@ export function createBot(): Client {
     });
   });
 
+  client.on("presenceUpdate", (oldPresence, newPresence) => {
+    void handleStatusRolePresenceUpdate(oldPresence, newPresence).catch((err) => {
+      logger.error({ err, guildId: newPresence.guild.id, userId: newPresence.userId }, "Error handling status-role presence update");
+    });
+  });
+
+  client.on("userUpdate", (oldUser, newUser) => {
+    void handleStatusRoleUserUpdate(client, oldUser, newUser).catch((err) => {
+      logger.error({ err, userId: newUser.id }, "Error handling guild-tag status-role update");
+    });
+  });
+
   client.on("voiceStateUpdate", (oldState, newState) => {
     void handleVoiceStateUpdate(client, oldState, newState).catch((err) => {
       logger.error({ err, guildId: newState.guild.id }, "Error handling voice state update");
@@ -95,14 +107,6 @@ export function createBot(): Client {
         await handleCreditAirdropButton(interaction);
       } catch (err) {
         logger.error({ err, customId: interaction.customId }, "Error handling credit airdrop entry");
-      }
-      return;
-    }
-    if (interaction.isButton() && interaction.customId.startsWith("afk:dm:")) {
-      try {
-        await handleAfkInteraction(interaction);
-      } catch (err) {
-        logger.error({ err, customId: interaction.customId }, "Error handling AFK notification preference");
       }
       return;
     }
