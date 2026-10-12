@@ -48,6 +48,7 @@ import { handleCreditDropCommand } from "./crates";
 import { handleCreditAirdropCommand } from "./creditAirdrop";
 import { handleEmbedCommand } from "./embeds";
 import { handleStatusRoleCommand } from "./statusRole";
+import { handleGuildTagRoleCommand } from "./guildTagRole";
 import { logger } from "../lib/logger";
 
 const PREFIX = "g";
@@ -111,6 +112,8 @@ export async function handleMessage(
     await handleWelcomeCommand(message);
   } else if (lower === "!statusrole" || lower.startsWith("!statusrole ")) {
     await handleStatusRoleCommand(message);
+  } else if (lower === "!guildtagrole" || lower.startsWith("!guildtagrole ")) {
+    await handleGuildTagRoleCommand(message);
   // ── Moderation ────────────────────────────────────────────────────────────
   } else if (lower === "!automod" || lower.startsWith("!automod ")) {
     await handleAutomodCommand(message);

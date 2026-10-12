@@ -3,12 +3,9 @@ import {
   ChannelType,
   EmbedBuilder,
   PermissionFlagsBits,
-  type Client,
   type GuildMember,
   type Message,
-  type PartialUser,
   type Presence,
-  type User,
 } from "discord.js";
 import { eq } from "drizzle-orm";
 import { botStatusRolesTable, db } from "@workspace/db";
@@ -161,18 +158,11 @@ function getMatchingTrigger(presence: Presence, triggerTexts: string[]): string 
   return triggerTexts.find((trigger) => customStatus.includes(trigger.toLocaleLowerCase())) ?? null;
 }
 
-function hasThisGuildTag(primaryGuild: User["primaryGuild"], guildId: string): boolean {
-  return primaryGuild?.identityGuildId === guildId &&
-    primaryGuild.identityEnabled === true &&
-    Boolean(primaryGuild.tag);
-}
-
 async function syncStatusRole(
   guild: GuildMember["guild"],
   member: GuildMember,
   settings: typeof botStatusRolesTable.$inferSelect,
   qualification: string | null,
-  source: "status" | "guild tag",
 ): Promise<void> {
   const role = await guild.roles.fetch(settings.roleId).catch(() => null);
   if (!role) return;
@@ -180,13 +170,25 @@ async function syncStatusRole(
 
   if (!qualification) {
     if (alreadyHasRole) {
-      await member.roles.remove(role, `${source} qualification was removed`);
+      await member.roles.remove(role, "Status trigger was removed");
+      const channel = await guild.channels.fetch(settings.logChannelId).catch(() => null);
+      if (channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement)) {
+        await channel.send({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0xED83AE)
+              .setTitle("Status Role Removed")
+              .setDescription(`<@${member.id}> removed the configured status trigger, so <@&${role.id}> was removed.`),
+          ],
+          allowedMentions: { parse: [] },
+        });
+      }
     }
     return;
   }
   if (alreadyHasRole) return;
 
-  await member.roles.add(role, `${source} qualification became active`);
+  await member.roles.add(role, "Status trigger became active");
   const channel = await guild.channels.fetch(settings.logChannelId).catch(() => null);
   if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) return;
 
@@ -219,50 +221,5 @@ export async function handleStatusRolePresenceUpdate(
   const previousTrigger = oldPresence ? getMatchingTrigger(oldPresence, settings.triggerTexts) : null;
   const matchingTrigger = getMatchingTrigger(presence, settings.triggerTexts);
   if (Boolean(previousTrigger) === Boolean(matchingTrigger)) return;
-  await syncStatusRole(guild, member, settings, matchingTrigger, "status");
-}
-
-export async function handleStatusRoleUserUpdate(
-  client: Client,
-  oldUser: User | PartialUser,
-  newUser: User,
-): Promise<void> {
-  if (newUser.bot) return;
-
-  const oldPrimaryGuild = "primaryGuild" in oldUser ? oldUser.primaryGuild : null;
-  const newPrimaryGuild = newUser.primaryGuild;
-  if (
-    oldPrimaryGuild?.identityGuildId === newPrimaryGuild?.identityGuildId &&
-    oldPrimaryGuild?.identityEnabled === newPrimaryGuild?.identityEnabled &&
-    oldPrimaryGuild?.tag === newPrimaryGuild?.tag
-  ) return;
-
-  const guildIds = new Set(
-    [oldPrimaryGuild?.identityGuildId, newPrimaryGuild?.identityGuildId]
-      .filter((id): id is string => Boolean(id)),
-  );
-  for (const guildId of guildIds) {
-    const guild = client.guilds.cache.get(guildId);
-    if (!guild) continue;
-
-    const member = guild.members.cache.get(newUser.id) ?? await guild.members.fetch(newUser.id).catch(() => null);
-    if (!member) continue;
-
-    const [settings] = await db.select()
-      .from(botStatusRolesTable)
-      .where(eq(botStatusRolesTable.guildId, guild.id))
-      .limit(1);
-    if (!settings) continue;
-
-    const previouslyHadTag = hasThisGuildTag(oldPrimaryGuild, guild.id);
-    const currentlyHasTag = hasThisGuildTag(newPrimaryGuild, guild.id);
-    if (previouslyHadTag === currentlyHasTag) continue;
-    await syncStatusRole(
-      guild,
-      member,
-      settings,
-      currentlyHasTag ? "server guild tag" : null,
-      "guild tag",
-    );
-  }
+  await syncStatusRole(guild, member, settings, matchingTrigger);
 }

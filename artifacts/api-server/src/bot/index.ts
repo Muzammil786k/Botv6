@@ -16,7 +16,8 @@ import { logger } from "../lib/logger";
 import { processUserMessageAutomations, sendMemberMessage } from "./automation";
 import { handleCreditDropReaction, startCreditDropScheduler } from "./crates";
 import { handleCreditAirdropButton, startCreditAirdropScheduler } from "./creditAirdrop";
-import { handleStatusRolePresenceUpdate, handleStatusRoleUserUpdate } from "./statusRole";
+import { handleStatusRolePresenceUpdate } from "./statusRole";
+import { handleGuildTagRoleUserUpdate } from "./guildTagRole";
 
 export function createBot(): Client {
   const token = process.env["DISCORD_BOT_TOKEN"];
@@ -75,8 +76,8 @@ export function createBot(): Client {
   });
 
   client.on("userUpdate", (oldUser, newUser) => {
-    void handleStatusRoleUserUpdate(client, oldUser, newUser).catch((err) => {
-      logger.error({ err, userId: newUser.id }, "Error handling guild-tag status-role update");
+    void handleGuildTagRoleUserUpdate(client, oldUser, newUser).catch((err) => {
+      logger.error({ err, userId: newUser.id }, "Error handling guild-tag role update");
     });
   });
 
