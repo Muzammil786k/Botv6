@@ -257,6 +257,7 @@ export async function handleQuote(message: Message): Promise<void> {
     );
     const attachment = new AttachmentBuilder(image, { name: "quote.png" });
     await message.reply({
+      suppressHelpFooter: true,
       embeds: [new EmbedBuilder().setColor(0x000000).setImage("attachment://quote.png")],
       files: [attachment],
       allowedMentions: { parse: [], repliedUser: false },
