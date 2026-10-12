@@ -171,18 +171,6 @@ async function syncStatusRole(
   if (!qualification) {
     if (alreadyHasRole) {
       await member.roles.remove(role, "Status trigger was removed");
-      const channel = await guild.channels.fetch(settings.logChannelId).catch(() => null);
-      if (channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement)) {
-        await channel.send({
-          embeds: [
-            new EmbedBuilder()
-              .setColor(0xED83AE)
-              .setTitle("Status Role Removed")
-              .setDescription(`<@${member.id}> removed the configured status trigger, so <@&${role.id}> was removed.`),
-          ],
-          allowedMentions: { parse: [] },
-        });
-      }
     }
     return;
   }
@@ -208,7 +196,7 @@ export async function handleStatusRolePresenceUpdate(
   oldPresence: Presence | null,
   presence: Presence,
 ): Promise<void> {
-  if (presence.user.bot) return;
+  if (presence.user.bot || presence.status === "offline") return;
   const guild = presence.guild;
   const [settings] = await db.select()
     .from(botStatusRolesTable)
@@ -218,8 +206,10 @@ export async function handleStatusRolePresenceUpdate(
 
   const member = presence.member ?? await guild.members.fetch(presence.userId).catch(() => null);
   if (!member) return;
-  const previousTrigger = oldPresence ? getMatchingTrigger(oldPresence, settings.triggerTexts) : null;
+  const previousTrigger = oldPresence && oldPresence.status !== "offline"
+    ? getMatchingTrigger(oldPresence, settings.triggerTexts)
+    : null;
   const matchingTrigger = getMatchingTrigger(presence, settings.triggerTexts);
-  if (Boolean(previousTrigger) === Boolean(matchingTrigger)) return;
+  if (oldPresence?.status !== "offline" && Boolean(previousTrigger) === Boolean(matchingTrigger)) return;
   await syncStatusRole(guild, member, settings, matchingTrigger);
 }
