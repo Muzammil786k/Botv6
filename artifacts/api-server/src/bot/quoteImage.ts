@@ -93,7 +93,7 @@ export async function renderQuoteImage(
   let lineHeight = 54;
   let lines: string[] = [];
   while (fontSize >= 26) {
-    context.font = `${fontSize}px Arial, sans-serif`;
+    context.font = `bold ${fontSize}px Arial, sans-serif`;
     lineHeight = Math.round(fontSize * 1.35);
     lines = wrapText(context, cleanQuote, QUOTE_WIDTH);
     if (lines.length * lineHeight <= QUOTE_HEIGHT) break;
@@ -112,6 +112,7 @@ export async function renderQuoteImage(
 
   context.textBaseline = "alphabetic";
   context.font = "bold 32px Arial, sans-serif";
+  context.fillStyle = "#ffffff";
   context.fillText(displayName.slice(0, 48), AVATAR_X, 565);
   context.font = "24px Arial, sans-serif";
   context.fillStyle = "#ffffff";

@@ -117,8 +117,12 @@ function styleReplyPayload(
   const existingEmbeds = Array.isArray(options.embeds) ? options.embeds : [];
 
   if (existingEmbeds.length > 0) {
+    const hasGeneratedQuoteImage = existingEmbeds.some(
+      (embed) => asApiEmbed(embed).image?.url === "attachment://quote.png",
+    );
     options.embeds = existingEmbeds.map((embed) => {
-      const styled = applyEmbedOverride(brandEmbed(embed, user, content, omitHelpFooter), override);
+      const branded = brandEmbed(embed, user, content, omitHelpFooter);
+      const styled = hasGeneratedQuoteImage ? branded : applyEmbedOverride(branded, override);
       if (omitHelpFooter) styled.setFooter(null);
       return styled;
     });
