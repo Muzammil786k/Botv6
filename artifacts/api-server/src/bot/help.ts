@@ -138,12 +138,17 @@ function page4(): EmbedBuilder {
   return helpPage("🧰 Server & Utility")
     .addFields(
       { name: "`!userinfo [@user]` • `/userinfo`", value: "View member ID, roles, account age, and join date." },
+      { name: "`!roleinfo @role`", value: "View a role's ID, member count, position, and permissions." },
       { name: "`!serverinfo` • `/serverinfo`", value: "View server owner, members, channels, roles, and boosts." },
       { name: "`!mc` / `!membercount` • `/mc`", value: "Show total, humans, bots, online, idle, DND, active, and offline counts." },
       { name: "`!ping` • `/ping`", value: "Show bot WebSocket latency and uptime." },
       { name: "`!botinfo` • `/botinfo`", value: "Show bot tag, server count, latency, and uptime." },
       { name: "`!channelinfo` • `/channelinfo`", value: "Show current channel ID, type, category, and creation time." },
       { name: "`!avatar [@user]` • `/avatar`", value: "Show a member's avatar in high resolution." },
+      { name: "`!banner [user @user|server]`", value: "Show your own banner, another user's banner, or the server banner." },
+      { name: "`!snipe`", value: "Show the most recently deleted message in this channel." },
+      { name: "`!reminder start <duration> <text>` / `!reminder clear`", value: "DM yourself a reminder later, or cancel all your pending reminders. Durations: `30s`, `5m`, `2h`, up to `7d`." },
+      { name: "`!timer <duration> [message]`", value: "Post a timer completion in this channel. Durations: `30s`, `5m`, `2h`, up to `7d`." },
       { name: "`!quote <text>` • `/quote`", value: "Create a clean black quote card with your avatar, display name, and username." },
       { name: "`!setquote #channel` • `/setquote channel`", value: "Restrict quote cards to one text channel. Check with `status` or clear with `remove`. *(Manage Server)*" },
       { name: "`!steal` (reply to an emoji or sticker)", value: "Choose to add an emoji or PNG/APNG/GIF sticker from the replied-to message as a server emoji or sticker. Lottie stickers are converted to a still image. Requires **Create Expressions** permission and an available slot." },
@@ -164,8 +169,12 @@ function pageAutomation(): EmbedBuilder {
       { name: "`!statusrole status`", value: "Show the configured role, triggers, and log channel. *(Manage Server)*" },
       { name: "`!statusrole remove`", value: "Disable status-role automation. *(Manage Server)*" },
       { name: "`!guildtagrole set @role #logs`", value: "Give members this role when they enable this server's guild tag. The configured channel logs when the role is added or removed. *(Manage Server)*" },
+      { name: "`!guildtagrole message <title> | <description>`", value: "Customize add/remove log embeds. Placeholders: `{{user}}`, `{{role}}`, `{{tag}}`, `{{action}}`, `{{actionLower}}`, and `{{roleAction}}`. *(Manage Server)*" },
+      { name: "`!guildtagrole message reset`", value: "Restore the default guild-tag log message. *(Manage Server)*" },
       { name: "`!guildtagrole status`", value: "Show the guild-tag role and log channel. *(Manage Server)*" },
       { name: "`!guildtagrole remove`", value: "Disable guild-tag role automation. *(Manage Server)*" },
+        { name: "`!auto emergency enable|disable|status`", value: "Monitor per-actor thresholds of 40 bans, 40 kicks, or 40 @everyone/@here pings within 10 minutes. On threshold, remove the executor's assignable roles and save permission snapshots. Configure with Manage Server; only the server owner can restore with `!auto emergency restore`. Requires View Audit Log and Manage Roles. Undefined unusual activity is not monitored." },
+        { name: "`!auto emergency restore`", value: "Owner-only: restore quarantined member roles and role permissions saved during emergency mode." },
       { name: "`!sticky set #channel <message>` • `/sticky set`", value: "Keep one branded message at the bottom of a channel. It moves after new messages." },
       { name: "`!sticky status #channel`", value: "Check whether a sticky message is configured in a channel." },
       { name: "`!sticky remove #channel` • `/sticky remove`", value: "Remove the sticky message and stop reposting it." },
@@ -195,7 +204,7 @@ function page5(): EmbedBuilder {
 function pageEconomy(): EmbedBuilder {
   return helpPage("💰 Economy")
     .addFields(
-      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\nEarn credits through chat and credit drops." },
+      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\n`!credits give @user <amount>` / `!credits remove @user <amount>` — adjust a member's balance (**Manage Server**).\nEarn credits through chat and credit drops." },
       { name: "🎉 **Credit Airdrop**", value: "`!airdrop <credits> <duration>` / `/airdrop create` — start a timed drop with an Enter button. Everyone who joins splits the pot evenly; leftover credits are distributed one each. Example: `!airdrop 200 10m`. *(Manage Server)*" },
       { name: "🏷️ **Role shop**", value: "`!shop` — browse numbered role/price pages\n`!shop buy @role` — buy with credits\n`!shop add @role <price>` — add a listing\n`!shop edit @role <new-price>` — edit its price\n`!shop remove @role` — remove a listing (**Manage Server**)" },
     )
@@ -270,14 +279,14 @@ function socialCategory(
 
 function scoresCategory(): EmbedBuilder {
   return helpPage("📊 Scores & Ships")
-    .setDescription("Score checks are for fun, daily readings. These are separate from the member-to-member social actions.")
+    .setDescription("For-fun scores refresh every 30 minutes. These are separate from the member-to-member social actions.")
     .addFields(
-      { name: "`!aura @user` • `/aura user`", value: "Show that member's daily aura score, mood, and a matching mood GIF." },
-      { name: "`!rizz @user` • `/rizz user`", value: "Show that member's daily rizz score out of 100." },
-      { name: "`!vibecheck @user` • `/vibecheck user`", value: "Show that member's daily vibe score out of 100." },
-      { name: "`!rate @user` • `/rate user`", value: "Give that member a playful daily rating out of 10." },
-      { name: "`!iq @user` • `/iq user`", value: "Show that member's daily, for-fun IQ score out of 200." },
-      { name: "`!ship @user1 @user2` • `/ship user1 user2`", value: "Show a fun compatibility score for two different members." },
+      { name: "`!aura @user` • `/aura user`", value: "Show that member's aura score, mood, and a matching mood GIF." },
+      { name: "`!rizz @user` • `/rizz user`", value: "Show that member's rizz score out of 100." },
+      { name: "`!vibecheck @user` • `/vibecheck user`", value: "Show that member's vibe score out of 100." },
+      { name: "`!rate @user` • `/rate user`", value: "Give that member a playful rating out of 10." },
+      { name: "`!iq @user` • `/iq user`", value: "Show that member's for-fun IQ score out of 200." },
+      { name: "`!ship @user1 @user2` • `/ship user1 user2`", value: "Show a fun compatibility score for two different members. The score refreshes every 30 minutes." },
     )
     .setFooter({ text: HELP_FOOTER });
 }

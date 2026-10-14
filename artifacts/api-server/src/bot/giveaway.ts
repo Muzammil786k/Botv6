@@ -58,7 +58,6 @@ function buildGiveawayEmbed(giveaway: Giveaway): EmbedBuilder {
       .setDescription(
         `Ended <t:${endsAt}:R>\nHosted by <@${giveaway.hostId}>\nParticipants: ${giveaway.participants.size}\n${winnersLine}`
       )
-      .setFooter({ text: "Use /help to see all commands" })
       .setTimestamp(giveaway.endsAt);
   }
 
@@ -70,7 +69,6 @@ function buildGiveawayEmbed(giveaway: Giveaway): EmbedBuilder {
     .setDescription(
       `End in ${timeLeft}\nHosted by <@${giveaway.hostId}>\nParticipants: ${giveaway.participants.size}`
     )
-    .setFooter({ text: "Use /help to see all commands" })
     .setTimestamp(giveaway.endsAt);
 }
 

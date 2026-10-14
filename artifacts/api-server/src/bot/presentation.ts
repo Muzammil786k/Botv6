@@ -9,7 +9,6 @@ import { and, eq } from "drizzle-orm";
 import { botEmbedOverridesTable, db } from "@workspace/db";
 import { SOCIAL_ACTION_NAMES } from "./social";
 
-const FOOTER_TEXT = "Use /help to see all commands";
 const BRAND_COLOR = 0x2b2d31;
 const SUCCESS_COLOR = BRAND_COLOR;
 const WARNING_COLOR = BRAND_COLOR;
@@ -40,9 +39,12 @@ function brandEmbed(
     embed.setFooter(null);
   } else {
     const existingFooter = data.footer?.text?.trim();
-    const footerText = existingFooter || FOOTER_TEXT;
-    const footerIcon = user?.displayAvatarURL({ size: 64 }) ?? data.footer?.icon_url;
-    embed.setFooter(footerIcon ? { text: footerText, iconURL: footerIcon } : { text: footerText });
+    if (existingFooter) {
+      const footerIcon = data.footer?.icon_url ?? user?.displayAvatarURL({ size: 64 });
+      embed.setFooter(footerIcon ? { text: existingFooter, iconURL: footerIcon } : { text: existingFooter });
+    } else {
+      embed.setFooter(null);
+    }
   }
   return embed;
 }
@@ -130,13 +132,9 @@ function styleReplyPayload(
   }
 
   if (content.trim()) {
-    const iconURL = user?.displayAvatarURL({ size: 64 });
     const embed = new EmbedBuilder()
       .setColor(BRAND_COLOR)
       .setDescription(content.slice(0, 4096));
-    if (!omitHelpFooter) {
-      embed.setFooter(iconURL ? { text: FOOTER_TEXT, iconURL } : { text: FOOTER_TEXT });
-    }
     if (clearExistingContent) {
       options.content = null;
     } else {
@@ -241,13 +239,11 @@ export function premiumMessagePayload(
 export function premiumEmbed(
   description: string,
   options: { title?: string; color?: number; thumbnail?: string } = {},
-  user?: ClientUser | null,
+  _user?: ClientUser | null,
 ): EmbedBuilder {
-  const iconURL = user?.displayAvatarURL({ size: 64 });
   const embed = new EmbedBuilder()
     .setColor(BRAND_COLOR)
     .setDescription(description.slice(0, 4096))
-    .setFooter(iconURL ? { text: FOOTER_TEXT, iconURL } : { text: FOOTER_TEXT })
     .setTimestamp();
 
   if (options.title) embed.setTitle(options.title);

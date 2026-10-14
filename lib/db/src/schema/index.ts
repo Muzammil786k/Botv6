@@ -38,3 +38,5 @@ export * from "./bot-role-shop";
 export * from "./bot-custom-embeds";
 export * from "./bot-status-roles";
 export * from "./bot-guild-tag-roles";
+export * from "./bot-emergency";
+export * from "./bot-scheduled-messages";

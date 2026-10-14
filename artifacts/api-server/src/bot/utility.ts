@@ -3,6 +3,8 @@ import {
   EmbedBuilder,
   PermissionFlagsBits,
   type Message,
+  type PartialMessage,
+  type Role,
   type TextChannel,
   type Client,
 } from "discord.js";
@@ -11,6 +13,129 @@ import { renderQuoteImage } from "./quoteImage";
 import { requireQuoteChannel } from "./quoteChannel";
 
 const C = 0xff0000;
+const snipedMessages = new Map<string, {
+  authorId: string;
+  authorName: string;
+  avatarUrl: string;
+  content: string;
+  attachmentUrl: string | null;
+  deletedAt: number;
+}>();
+
+export async function rememberDeletedMessage(message: Message | PartialMessage): Promise<void> {
+  if (message.partial) return;
+  if (!message.guildId || message.author?.bot) return;
+  const attachment = message.attachments.first();
+  if (!message.content.trim() && !attachment) return;
+
+  snipedMessages.set(message.channelId, {
+    authorId: message.author.id,
+    authorName: message.member?.displayName ?? message.author.displayName,
+    avatarUrl: message.author.displayAvatarURL({ size: 128 }),
+    content: message.content.trim().slice(0, 3000),
+    attachmentUrl: attachment?.url ?? null,
+    deletedAt: Date.now(),
+  });
+}
+
+function parseRole(guild: NonNullable<Message["guild"]>, input: string): Role | null {
+  const roleId = /^<@&(\d{17,20})>$/.exec(input)?.[1] ?? input;
+  return guild.roles.cache.get(roleId) ??
+    guild.roles.cache.find((role) => role.name.toLocaleLowerCase() === input.toLocaleLowerCase()) ??
+    null;
+}
+
+export async function handleRoleInfo(message: Message): Promise<void> {
+  const guild = message.guild;
+  if (!guild) return;
+  const role = message.mentions.roles.first() ?? parseRole(guild, message.content.trim().replace(/^!roleinfo\s*/i, ""));
+  if (!role) {
+    await message.reply({ content: "Usage: `!roleinfo @role` or `!roleinfo Role Name`", allowedMentions: { parse: [], repliedUser: false } });
+    return;
+  }
+
+  const permissions = role.permissions.toArray();
+  const permissionSummary = permissions.slice(0, 6).map((permission) => permission.replace(/([a-z])([A-Z])/g, "$1 $2")).join(", ") || "None";
+  await message.reply({
+    suppressHelpFooter: true,
+    embeds: [
+      new EmbedBuilder()
+        .setColor(role.color || C)
+        .setTitle(`🎭 ${role.name}`)
+        .setDescription(
+          `<@&${role.id}> · \`${role.id}\`\n` +
+          `👥 ${role.members.size} members · Position ${role.position} · ${role.hoist ? "Displayed separately" : "Not hoisted"}\n` +
+          `Permissions: ${permissionSummary}${permissions.length > 6 ? ` +${permissions.length - 6} more` : ""}`,
+        ),
+    ],
+    allowedMentions: { parse: [] },
+  });
+}
+
+export async function handleBanner(message: Message): Promise<void> {
+  const guild = message.guild;
+  if (!guild) return;
+  const [, modeOrTarget, targetArgument] = message.content.trim().split(/\s+/, 3);
+  const isServerBanner = modeOrTarget?.toLowerCase() === "server";
+
+  if (isServerBanner) {
+    const bannerUrl = guild.bannerURL({ size: 4096 });
+    const embed = new EmbedBuilder()
+      .setColor(C)
+      .setTitle(`${guild.name} server banner`)
+      .setDescription(bannerUrl ? `[Open banner](${bannerUrl})` : "This server has no banner set.");
+    if (bannerUrl) embed.setImage(bannerUrl);
+    await message.reply({
+      suppressHelpFooter: true,
+      embeds: [embed],
+      allowedMentions: { parse: [] },
+    });
+    return;
+  }
+
+  const target = message.mentions.users.first() ??
+    (modeOrTarget?.toLowerCase() === "user" && targetArgument
+      ? guild.members.cache.get(targetArgument)?.user ?? null
+      : message.author);
+  if (!target) {
+    await message.reply({ content: "Mention a server member. Usage: `!banner user @user`.", allowedMentions: { parse: [], repliedUser: false } });
+    return;
+  }
+
+  const freshUser = await target.fetch(true).catch(() => target);
+  const bannerUrl = freshUser.bannerURL({ size: 4096 });
+  const embed = new EmbedBuilder()
+    .setColor(C)
+    .setTitle(`${freshUser.username}'s banner`)
+    .setDescription(bannerUrl ? `[Open banner](${bannerUrl})` : "This user has no profile banner set.");
+  if (bannerUrl) embed.setImage(bannerUrl);
+  await message.reply({
+    suppressHelpFooter: true,
+    embeds: [embed],
+    allowedMentions: { parse: [] },
+  });
+}
+
+export async function handleSnipe(message: Message): Promise<void> {
+  if (!message.guild) return;
+  const entry = snipedMessages.get(message.channelId);
+  if (!entry) {
+    await message.reply({ content: "There is no deleted message to show in this channel.", allowedMentions: { parse: [], repliedUser: false } });
+    return;
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(C)
+    .setAuthor({ name: entry.authorName, iconURL: entry.avatarUrl })
+    .setDescription(entry.content || "[Attachment]")
+    .setTimestamp(entry.deletedAt);
+  if (entry.attachmentUrl) embed.addFields({ name: "Attachment", value: `[Open file](${entry.attachmentUrl})` });
+  await message.reply({
+    suppressHelpFooter: true,
+    embeds: [embed],
+    allowedMentions: { parse: [] },
+  });
+}
 
 // ─── User Info ─────────────────────────────────────────────────────────────────
 
@@ -26,32 +151,28 @@ export async function handleUserInfo(message: Message): Promise<void> {
     return;
   }
 
-  const roles = target.roles.cache
+  const roleCount = target.roles.cache.size - 1;
+  const roleNames = target.roles.cache
     .filter((r) => r.id !== message.guild!.id)
     .sort((a, b) => b.position - a.position)
-    .map((r) => `<@&${r.id}>`)
-    .slice(0, 10)
-    .join(", ") || "None";
+    .map((role) => role.name)
+    .slice(0, 5);
+  const roles = `${roleNames.join(", ") || "None"}${roleCount > roleNames.length ? ` +${roleCount - roleNames.length} more` : ""}`;
 
-  const joinedAt = target.joinedAt ? `<t:${Math.floor(target.joinedAt.getTime() / 1000)}:F>` : "Unknown";
+  const joinedAt = target.joinedAt ? `<t:${Math.floor(target.joinedAt.getTime() / 1000)}:R>` : "Unknown";
   const createdAt = `<t:${Math.floor(target.user.createdAt.getTime() / 1000)}:F>`;
 
   await message.reply({
+    suppressHelpFooter: true,
     embeds: [
       new EmbedBuilder()
         .setColor(C)
-        .setTitle(`👤 ${target.user.username}`)
-        .setThumbnail(target.user.displayAvatarURL({ size: 256 }))
-        .addFields(
-          { name: "Display Name", value: target.displayName, inline: true },
-          { name: "ID", value: target.id, inline: true },
-          { name: "Bot", value: target.user.bot ? "Yes" : "No", inline: true },
-          { name: "Account Created", value: createdAt, inline: false },
-          { name: "Joined Server", value: joinedAt, inline: false },
-          { name: `Roles (${target.roles.cache.size - 1})`, value: roles, inline: false },
-        )
-        .setFooter({ text: `Requested by ${message.author.username}` })
-        .setTimestamp(),
+        .setTitle(`👤 ${target.displayName}`)
+        .setDescription(
+          `<@${target.id}> · ${target.user.bot ? "Bot" : "Member"} · \`${target.id}\`\n` +
+          `Joined ${joinedAt} · Created <t:${Math.floor(target.user.createdAt.getTime() / 1000)}:R>\n` +
+          `Roles (${roleCount}): ${roles}`,
+        ),
     ],
   });
 }
@@ -69,22 +190,17 @@ export async function handleServerInfo(message: Message): Promise<void> {
   const bots = guild.members.cache.filter((m) => m.user.bot).size;
 
   await message.reply({
+    suppressHelpFooter: true,
     embeds: [
       new EmbedBuilder()
         .setColor(C)
-        .setTitle(`🏠 ${guild.name}`)
-        .setThumbnail(guild.iconURL({ size: 256 }) ?? null)
-        .addFields(
-          { name: "Owner", value: owner ? `<@${owner.id}>` : "Unknown", inline: true },
-          { name: "Server ID", value: guild.id, inline: true },
-          { name: "Created", value: createdAt, inline: false },
-          { name: "Members", value: `👥 **${guild.memberCount}** total | 👤 ${humans} humans | 🤖 ${bots} bots`, inline: false },
-          { name: "Channels", value: `${guild.channels.cache.size}`, inline: true },
-          { name: "Roles", value: `${guild.roles.cache.size}`, inline: true },
-          { name: "Boost Level", value: `Level ${guild.premiumTier}`, inline: true },
-        )
-        .setFooter({ text: `Requested by ${message.author.username}` })
-        .setTimestamp(),
+        .setTitle("🏠 Server Info")
+        .setDescription(
+          `**${guild.name}** · \`${guild.id}\`\n` +
+          `👑 ${owner ? `<@${owner.id}>` : "Unknown"} · Created <t:${Math.floor(guild.createdAt.getTime() / 1000)}:R>\n` +
+          `👥 ${guild.memberCount} · 👤 ${humans} humans · 🤖 ${bots} bots\n` +
+          `#️⃣ ${guild.channels.cache.size} channels · 🛡️ ${guild.roles.cache.size} roles · 🚀 Boost ${guild.premiumTier}`,
+        ),
     ],
   });
 }
@@ -128,20 +244,12 @@ export async function handleMemberCount(message: Message): Promise<void> {
     embeds: [
       new EmbedBuilder()
         .setColor(0x5865f2)
-        .setTitle(`📊 Member Count — ${guild.name}`)
-        .setThumbnail(guild.iconURL({ size: 256 }) ?? null)
-        .addFields(
-          { name: "Total Members", value: `**${guild.memberCount}**`, inline: true },
-          { name: "Humans", value: `👤 **${humans}**`, inline: true },
-          { name: "Bots", value: `🤖 **${bots}**`, inline: true },
-          { name: "Online", value: `🟢 **${online}**`, inline: true },
-          { name: "Idle", value: `🟡 **${idle}**`, inline: true },
-          { name: "Do Not Disturb", value: `🔴 **${dnd}**`, inline: true },
-          { name: "Offline", value: `⚫ **${offline}**`, inline: true },
-          { name: "Active Now", value: `✨ **${active}**`, inline: true },
-        )
-        .setFooter({ text: "Presence counts require the Server Members and Presence intents." })
-        .setTimestamp(),
+        .setTitle("📊 Members")
+        .setDescription(
+          `👥 **${guild.memberCount}** · 👤 ${humans} humans · 🤖 ${bots} bots\n` +
+          `🟢 ${online} online · 🟡 ${idle} idle · 🔴 ${dnd} DND · ⚫ ${offline} offline\n` +
+          `✨ ${active} active`,
+        ),
     ],
   });
 }
@@ -167,15 +275,12 @@ function formatDuration(milliseconds: number): string {
 
 export async function handlePing(client: Client, message: Message): Promise<void> {
   await message.reply({
+    suppressHelpFooter: true,
     embeds: [
       new EmbedBuilder()
         .setColor(0x57f287)
         .setTitle("🏓 Pong!")
-        .addFields(
-          { name: "WebSocket", value: `${client.ws.ping}ms`, inline: true },
-          { name: "Uptime", value: formatDuration(client.uptime ?? 0), inline: true },
-        )
-        .setTimestamp(),
+        .setDescription(`WebSocket **${client.ws.ping} ms** · Uptime **${formatDuration(client.uptime ?? 0)}**`),
     ],
   });
 }
@@ -183,19 +288,15 @@ export async function handlePing(client: Client, message: Message): Promise<void
 export async function handleBotInfo(client: Client, message: Message): Promise<void> {
   const user = client.user;
   await message.reply({
+    suppressHelpFooter: true,
     embeds: [
       new EmbedBuilder()
         .setColor(0x5865f2)
-        .setTitle("🤖 Bot Information")
-        .setThumbnail(user?.displayAvatarURL({ size: 256 }) ?? null)
-        .addFields(
-          { name: "Bot", value: user ? `${user} \`${user.tag}\`` : "Unknown", inline: false },
-          { name: "Servers", value: `${client.guilds.cache.size}`, inline: true },
-          { name: "Uptime", value: formatDuration(client.uptime ?? 0), inline: true },
-          { name: "WebSocket", value: `${client.ws.ping}ms`, inline: true },
-        )
-        .setFooter({ text: "Use /help to see all commands" })
-        .setTimestamp(),
+        .setTitle("🤖 Bot Info")
+        .setDescription(
+          `${user ? `${user} · \`${user.tag}\`` : "Unknown"}\n` +
+          `🌐 ${client.guilds.cache.size} servers · ⏱️ ${formatDuration(client.uptime ?? 0)} · 🛰️ ${client.ws.ping} ms`,
+        ),
     ],
   });
 }
@@ -204,17 +305,15 @@ export async function handleChannelInfo(message: Message): Promise<void> {
   if (!message.guild) return;
   const channel = message.channel as TextChannel;
   await message.reply({
+    suppressHelpFooter: true,
     embeds: [
       new EmbedBuilder()
         .setColor(0x5865f2)
-        .setTitle(`📺 Channel Information — #${channel.name}`)
-        .addFields(
-          { name: "Channel ID", value: channel.id, inline: true },
-          { name: "Type", value: String(channel.type), inline: true },
-          { name: "Category", value: channel.parent ? `<#${channel.parent.id}>` : "None", inline: true },
-          { name: "Created", value: channel.createdAt ? `<t:${Math.floor(channel.createdAt.getTime() / 1000)}:F>` : "Unknown", inline: false },
-        )
-        .setTimestamp(),
+        .setTitle(`📺 #${channel.name}`)
+        .setDescription(
+          `\`${channel.id}\` · Type ${String(channel.type)}\n` +
+          `Category ${channel.parent ? `<#${channel.parent.id}>` : "None"} · Created ${channel.createdAt ? `<t:${Math.floor(channel.createdAt.getTime() / 1000)}:R>` : "Unknown"}`,
+        ),
     ],
   });
 }
@@ -258,7 +357,12 @@ export async function handleQuote(message: Message): Promise<void> {
     const attachment = new AttachmentBuilder(image, { name: "quote.png" });
     await message.reply({
       suppressHelpFooter: true,
-      embeds: [new EmbedBuilder().setColor(0x000000).setImage("attachment://quote.png")],
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x000000)
+          .setDescription(`“${quote.slice(0, 4000)}”`)
+          .setImage("attachment://quote.png"),
+      ],
       files: [attachment],
       allowedMentions: { parse: [], repliedUser: false },
     });
