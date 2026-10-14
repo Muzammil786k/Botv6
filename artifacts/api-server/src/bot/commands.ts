@@ -25,7 +25,11 @@ import {
   handleBotInfo,
   handleChannelInfo,
   handleQuote,
+  handleRoleInfo,
+  handleBanner,
+  handleSnipe,
 } from "./utility";
+import { handleReminderCommand, handleTimerCommand } from "./reminders";
 import { handleShip, handleSocialAction, SOCIAL_ACTIONS, type SocialActionName } from "./social";
 import { handleSteal } from "./steal";
 import { handleAutoModeration, handleAutomodCommand } from "./moderation";
@@ -49,6 +53,7 @@ import { handleCreditAirdropCommand } from "./creditAirdrop";
 import { handleEmbedCommand } from "./embeds";
 import { handleStatusRoleCommand } from "./statusRole";
 import { handleGuildTagRoleCommand } from "./guildTagRole";
+import { handleAutoEmergencyCommand } from "./emergency";
 import { logger } from "../lib/logger";
 
 const PREFIX = "g";
@@ -110,10 +115,16 @@ export async function handleMessage(
     await handleStickyCommand(client, message);
   } else if (lower === "!welcome" || lower.startsWith("!welcome ")) {
     await handleWelcomeCommand(message);
+  } else if (lower === "!reminder" || lower.startsWith("!reminder ")) {
+    await handleReminderCommand(message);
+  } else if (lower === "!timer" || lower.startsWith("!timer ")) {
+    await handleTimerCommand(message);
   } else if (lower === "!statusrole" || lower.startsWith("!statusrole ")) {
     await handleStatusRoleCommand(message);
   } else if (lower === "!guildtagrole" || lower.startsWith("!guildtagrole ")) {
     await handleGuildTagRoleCommand(message);
+  } else if (lower === "!auto emergency" || lower.startsWith("!auto emergency ")) {
+    await handleAutoEmergencyCommand(message);
   // ── Moderation ────────────────────────────────────────────────────────────
   } else if (lower === "!automod" || lower.startsWith("!automod ")) {
     await handleAutomodCommand(message);
@@ -157,6 +168,8 @@ export async function handleMessage(
   // ── Utility ───────────────────────────────────────────────────────────────
   } else if (lower === "!userinfo" || lower.startsWith("!userinfo ")) {
     await handleUserInfo(message);
+  } else if (lower === "!roleinfo" || lower.startsWith("!roleinfo ")) {
+    await handleRoleInfo(message);
   } else if (lower === "!serverinfo") {
     await handleServerInfo(message);
   } else if (lower === "!mc" || lower === "!membercount") {
@@ -169,6 +182,10 @@ export async function handleMessage(
     await handleChannelInfo(message);
   } else if (lower === "!avatar" || lower.startsWith("!avatar ")) {
     await handleAvatar(message);
+  } else if (lower === "!banner" || lower.startsWith("!banner ")) {
+    await handleBanner(message);
+  } else if (lower === "!snipe") {
+    await handleSnipe(message);
   } else if (lower === "!quote" || lower.startsWith("!quote ")) {
     await handleQuote(message);
   } else if (lower === "!setquote" || lower.startsWith("!setquote ")) {

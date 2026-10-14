@@ -11,6 +11,10 @@ import { eq } from "drizzle-orm";
 import { botGuildTagRolesTable, db } from "@workspace/db";
 import { logger } from "../lib/logger";
 
+const DEFAULT_LOG_TITLE = "Guild Tag Role {{action}}";
+const DEFAULT_LOG_DESCRIPTION =
+  "{{user}} {{actionLower}} this server's guild tag (`{{tag}}`) and {{roleAction}} {{role}}.";
+
 async function reply(message: Message, content: string): Promise<void> {
   await message.reply({ content, allowedMentions: { parse: [], repliedUser: false } });
 }
@@ -64,13 +68,47 @@ export async function handleGuildTagRoleCommand(message: Message): Promise<void>
       return;
     }
 
+    if (action === "message") {
+      const [settings] = await db.select()
+        .from(botGuildTagRolesTable)
+        .where(eq(botGuildTagRolesTable.guildId, guild.id))
+        .limit(1);
+      if (!settings) {
+        await reply(message, "Set up guild-tag roles first with `!guildtagrole set @role #logs`.");
+        return;
+      }
+
+      const value = message.content.trim().replace(/^!guildtagrole\s+message\s*/i, "");
+      if (value.toLowerCase() === "reset") {
+        await db.update(botGuildTagRolesTable)
+          .set({ embedTitle: null, embedDescription: null, updatedAt: new Date() })
+          .where(eq(botGuildTagRolesTable.guildId, guild.id));
+        await reply(message, "Guild-tag role log message reset to the default.");
+        return;
+      }
+
+      const separator = value.indexOf("|");
+      const title = separator < 0 ? "" : value.slice(0, separator).trim();
+      const description = separator < 0 ? "" : value.slice(separator + 1).trim();
+      if (!title || !description || title.length > 256 || description.length > 4096) {
+        await reply(message, "Usage: `!guildtagrole message <title> | <description>` (placeholders: `{{user}}`, `{{role}}`, `{{tag}}`, `{{action}}`, `{{actionLower}}`, `{{roleAction}}`).");
+        return;
+      }
+
+      await db.update(botGuildTagRolesTable)
+        .set({ embedTitle: title, embedDescription: description, updatedAt: new Date() })
+        .where(eq(botGuildTagRolesTable.guildId, guild.id));
+      await reply(message, "Guild-tag role log message updated.");
+      return;
+    }
+
     if (action === "status") {
       const [settings] = await db.select()
         .from(botGuildTagRolesTable)
         .where(eq(botGuildTagRolesTable.guildId, guild.id))
         .limit(1);
       await reply(message, settings
-        ? `Guild-tag role: <@&${settings.roleId}>\nLogs: <#${settings.logChannelId}>`
+        ? `Guild-tag role: <@&${settings.roleId}>\nLogs: <#${settings.logChannelId}>\nLog message: ${settings.embedTitle ? "custom" : "default"}`
         : "Guild-tag role is not configured. Use `!guildtagrole set @role #logs`.");
       return;
     }
@@ -85,7 +123,7 @@ export async function handleGuildTagRoleCommand(message: Message): Promise<void>
       return;
     }
 
-    await reply(message, "Usage: `!guildtagrole set @role #logs`, `!guildtagrole status`, or `!guildtagrole remove`.");
+    await reply(message, "Usage: `!guildtagrole set @role #logs`, `!guildtagrole message <title> | <description>`, `!guildtagrole message reset`, `!guildtagrole status`, or `!guildtagrole remove`.");
   } catch (error) {
     logger.error({ err: error, guildId: guild.id }, "Guild-tag role command failed");
     await reply(message, "Could not update guild-tag role settings. Please try again.").catch(() => {});
@@ -100,22 +138,33 @@ function hasGuildTag(primaryGuild: User["primaryGuild"], guildId: string): boole
 
 async function sendGuildTagRoleLog(
   guild: NonNullable<ReturnType<Client["guilds"]["cache"]["get"]>>,
-  channelId: string,
+  settings: typeof botGuildTagRolesTable.$inferSelect,
   userId: string,
   roleId: string,
+  tag: string,
   added: boolean,
 ): Promise<void> {
-  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  const channel = await guild.channels.fetch(settings.logChannelId).catch(() => null);
   if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) return;
+
+  const action = added ? "Added" : "Removed";
+  const replacements: [string, string][] = [
+    ["{{user}}", `<@${userId}>`],
+    ["{{role}}", `<@&${roleId}>`],
+    ["{{tag}}", tag],
+    ["{{action}}", action],
+    ["{{actionLower}}", action.toLowerCase()],
+    ["{{roleAction}}", added ? "received" : "lost"],
+  ];
+  const render = (template: string) =>
+    replacements.reduce((result, [placeholder, value]) => result.replaceAll(placeholder, value), template);
 
   await channel.send({
     embeds: [
       new EmbedBuilder()
         .setColor(added ? 0x57F287 : 0xED4245)
-        .setTitle(added ? "Guild Tag Role Added" : "Guild Tag Role Removed")
-        .setDescription(added
-          ? `<@${userId}> added this server's guild tag and received <@&${roleId}>.`
-          : `<@${userId}> removed this server's guild tag and lost <@&${roleId}>.`),
+        .setTitle(render(settings.embedTitle ?? DEFAULT_LOG_TITLE))
+        .setDescription(render(settings.embedDescription ?? DEFAULT_LOG_DESCRIPTION)),
     ],
     allowedMentions: { parse: [] },
   });
@@ -160,10 +209,10 @@ export async function handleGuildTagRoleUserUpdate(
 
     if (currentlyHasTag && !member.roles.cache.has(role.id)) {
       await member.roles.add(role, "Member enabled this server's guild tag");
-      await sendGuildTagRoleLog(guild, settings.logChannelId, member.id, role.id, true);
+      await sendGuildTagRoleLog(guild, settings, member.id, role.id, newPrimaryGuild.tag ?? "", true);
     } else if (!currentlyHasTag && member.roles.cache.has(role.id)) {
       await member.roles.remove(role, "Member disabled this server's guild tag");
-      await sendGuildTagRoleLog(guild, settings.logChannelId, member.id, role.id, false);
+      await sendGuildTagRoleLog(guild, settings, member.id, role.id, oldPrimaryGuild?.tag ?? "", false);
     }
   }
 }

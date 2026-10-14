@@ -6,6 +6,8 @@ import {
   type User,
 } from "discord.js";
 import { handleMessage } from "./commands";
+import { rememberDeletedMessage } from "./utility";
+import { startReminderScheduler } from "./reminders";
 import { handleEmbedInteraction } from "./embeds";
 import { handleSlashCommand, registerSlashCommands } from "./slash";
 import { handleSocialBackButton } from "./social";
@@ -18,6 +20,13 @@ import { handleCreditDropReaction, startCreditDropScheduler } from "./crates";
 import { handleCreditAirdropButton, startCreditAirdropScheduler } from "./creditAirdrop";
 import { handleStatusRolePresenceUpdate } from "./statusRole";
 import { handleGuildTagRoleUserUpdate } from "./guildTagRole";
+import {
+  handleAutoEmergencyCommand,
+  handleEmergencyBanAdd,
+  handleEmergencyEveryonePing,
+  handleEmergencyMemberRemove,
+  handleEmergencyRoleUpdate,
+} from "./emergency";
 
 export function createBot(): Client {
   const token = process.env["DISCORD_BOT_TOKEN"];
@@ -32,6 +41,7 @@ export function createBot(): Client {
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
       GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildModeration,
       GatewayIntentBits.GuildPresences,
       GatewayIntentBits.GuildMessageReactions,
       GatewayIntentBits.GuildVoiceStates,
@@ -44,6 +54,7 @@ export function createBot(): Client {
     startCreditDropScheduler(client);
     startCreditAirdropScheduler(client);
     startTempChannelCleanupScheduler(client);
+    startReminderScheduler(client);
     void registerSlashCommands(client);
   });
 
@@ -54,6 +65,11 @@ export function createBot(): Client {
   });
 
   client.on("messageCreate", async (message) => {
+    if (message.mentions.everyone) {
+      void handleEmergencyEveryonePing(client, message).catch((err) => {
+        logger.error({ err, guildId: message.guildId, userId: message.author.id }, "Error checking emergency @everyone threshold");
+      });
+    }
     try {
       await handleMessage(client, message);
     } catch (err) {
@@ -63,9 +79,33 @@ export function createBot(): Client {
     }
   });
 
+  client.on("messageDelete", (message) => {
+    void rememberDeletedMessage(message).catch((err) => {
+      logger.error({ err, guildId: message.guildId, channelId: message.channelId }, "Could not cache deleted message for snipe");
+    });
+  });
+
   client.on("guildMemberAdd", (member) => {
     void sendMemberMessage(client, member, "welcome").catch((err) => {
       logger.error({ err, guildId: member.guild.id }, "Could not send welcome message");
+    });
+  });
+
+  client.on("guildBanAdd", (ban) => {
+    void handleEmergencyBanAdd(client, ban).catch((err) => {
+      logger.error({ err, guildId: ban.guild.id, userId: ban.user.id }, "Error checking emergency ban threshold");
+    });
+  });
+
+  client.on("guildMemberRemove", (member) => {
+    void handleEmergencyMemberRemove(client, member).catch((err) => {
+      logger.error({ err, guildId: member.guild.id, userId: member.id }, "Error checking emergency kick threshold");
+    });
+  });
+
+  client.on("guildRoleUpdate", (oldRole, newRole) => {
+    void handleEmergencyRoleUpdate(oldRole, newRole).catch((err) => {
+      logger.error({ err, guildId: newRole.guild.id, roleId: newRole.id }, "Error saving emergency role permissions");
     });
   });
 

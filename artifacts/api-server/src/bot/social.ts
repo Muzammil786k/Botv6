@@ -30,6 +30,11 @@ function dailyScore(kind: string, targetId: string, min: number, max: number): n
   return seededScore(`${kind}:${targetId}:${day}`, min, max);
 }
 
+function scoreEveryThirtyMinutes(kind: string, targetId: string, min: number, max: number): number {
+  const period = Math.floor(Date.now() / (30 * 60_000));
+  return seededScore(`${kind}:${targetId}:${period}`, min, max);
+}
+
 export const SOCIAL_ACTIONS = {
   hug: {
     description: "Give a member a warm hug.",
@@ -256,12 +261,12 @@ export const SOCIAL_ACTIONS = {
     render: (actor, target) => `${actor} gives ${target} a big round of applause!`,
   },
   aura: {
-    description: "Check a member's daily aura score.",
+    description: "Check a member's aura score, refreshed every 30 minutes.",
     title: "✨ Aura check",
-    help: "See someone's daily aura points. The score changes each day.",
+    help: "See someone's aura points. The score refreshes every 30 minutes.",
     gifCategory: "smug",
     render: (_actor, target, targetId) => {
-      const score = dailyScore("aura", targetId, -1000, 1000);
+      const score = scoreEveryThirtyMinutes("aura", targetId, -1000, 1000);
       const points = `${score >= 0 ? "+" : ""}${score.toLocaleString()}`;
       const verdict =
         score >= 750
@@ -269,16 +274,16 @@ export const SOCIAL_ACTIONS = {
           : score >= 0
             ? "Aura is looking good."
             : "A little aura debt—comeback loading!";
-      return `**${target}** has **${points} aura** today. ${verdict}`;
+      return `**${target}** has **${points} aura** right now. ${verdict}`;
     },
   },
   rizz: {
-    description: "Get a member's daily rizz score.",
+    description: "Get a member's rizz score, refreshed every 30 minutes.",
     title: "😎 Rizz check",
-    help: "Get someone's daily charm score, out of 100.",
+    help: "Get someone's charm score, out of 100. Refreshes every 30 minutes.",
     gifCategory: "wink",
     render: (_actor, target, targetId) => {
-      const score = dailyScore("rizz", targetId, 0, 100);
+      const score = scoreEveryThirtyMinutes("rizz", targetId, 0, 100);
       const verdict =
         score >= 85
           ? "Certified smooth."
@@ -287,16 +292,16 @@ export const SOCIAL_ACTIONS = {
             : score >= 30
               ? "Rizz is loading..."
               : "Quiet confidence still counts.";
-      return `**${target}** has **${score}/100 rizz** today. ${verdict}`;
+      return `**${target}** has **${score}/100 rizz** right now. ${verdict}`;
     },
   },
   vibecheck: {
-    description: "Run a playful daily vibe check on a member.",
+    description: "Run a playful vibe check on a member, refreshed every 30 minutes.",
     title: "🌈 Vibe check",
-    help: "Check someone's daily vibe score, out of 100.",
+    help: "Check someone's vibe score, out of 100. Refreshes every 30 minutes.",
     gifCategory: "smile",
     render: (_actor, target, targetId) => {
-      const score = dailyScore("vibe", targetId, 0, 100);
+      const score = scoreEveryThirtyMinutes("vibe", targetId, 0, 100);
       const verdict =
         score >= 80
           ? "Excellent vibes."
@@ -305,27 +310,27 @@ export const SOCIAL_ACTIONS = {
             : score >= 30
               ? "A calm, low-key vibe."
               : "Recharge mode—be kind to yourself.";
-      return `**${target}** scores **${score}/100** on today's vibe check. ${verdict}`;
+      return `**${target}** scores **${score}/100** on this vibe check. ${verdict}`;
     },
   },
   rate: {
-    description: "Give a member a playful daily rating.",
-    title: "⭐ Daily rating",
-    help: "Give someone a friendly, for-fun rating out of 10.",
+    description: "Give a member a playful rating, refreshed every 30 minutes.",
+    title: "⭐ Rating",
+    help: "Give someone a friendly, for-fun rating out of 10. Refreshes every 30 minutes.",
     gifCategory: "happy",
     render: (_actor, target, targetId) => {
-      const score = dailyScore("rate", targetId, 0, 100);
-      return `Today's totally-for-fun rating for **${target}**: **${(score / 10).toFixed(1)}/10** ⭐`;
+      const score = scoreEveryThirtyMinutes("rate", targetId, 0, 100);
+      return `Current totally-for-fun rating for **${target}**: **${(score / 10).toFixed(1)}/10** ⭐`;
     },
   },
   iq: {
-    description: "Get a member's playful daily IQ score.",
+    description: "Get a member's playful IQ score, refreshed every 30 minutes.",
     title: "🧠 IQ check",
-    help: "Show someone's daily, for-fun IQ score out of 200.",
+    help: "Show someone's for-fun IQ score out of 200. Refreshes every 30 minutes.",
     gifCategory: "think",
     render: (_actor, target, targetId) => {
-      const score = dailyScore("iq", targetId, 0, 200);
-      return `**${target}** has **${score} IQ** today. Just for fun!`;
+      const score = scoreEveryThirtyMinutes("iq", targetId, 0, 200);
+      return `**${target}** has **${score} IQ** right now. Just for fun!`;
     },
   },
   compliment: {
@@ -395,7 +400,7 @@ function buildScoreCard(
 
   switch (actionName) {
     case "aura": {
-      score = dailyScore("aura", targetId, -1000, 1000);
+      score = scoreEveryThirtyMinutes("aura", targetId, -1000, 1000);
       minimum = -1000;
       maximum = 1000;
       scoreLabel = `${score >= 0 ? "+" : ""}${score.toLocaleString()} aura`;
@@ -407,7 +412,7 @@ function buildScoreCard(
       break;
     }
     case "rizz": {
-      score = dailyScore("rizz", targetId, 0, 100);
+      score = scoreEveryThirtyMinutes("rizz", targetId, 0, 100);
       minimum = 0;
       maximum = 100;
       scoreLabel = `${score}/100`;
@@ -421,7 +426,7 @@ function buildScoreCard(
       break;
     }
     case "vibecheck": {
-      score = dailyScore("vibe", targetId, 0, 100);
+      score = scoreEveryThirtyMinutes("vibe", targetId, 0, 100);
       minimum = 0;
       maximum = 100;
       scoreLabel = `${score}/100`;
@@ -435,25 +440,25 @@ function buildScoreCard(
       break;
     }
     case "rate": {
-      score = dailyScore("rate", targetId, 0, 100);
+      score = scoreEveryThirtyMinutes("rate", targetId, 0, 100);
       minimum = 0;
       maximum = 100;
       scoreLabel = `${(score / 10).toFixed(1)}/10`;
-      reading = "A totally-for-fun daily rating.";
+      reading = "A totally-for-fun rating, refreshed every 30 minutes.";
       break;
     }
     case "iq": {
-      score = dailyScore("iq", targetId, 0, 200);
+      score = scoreEveryThirtyMinutes("iq", targetId, 0, 200);
       minimum = 0;
       maximum = 200;
       scoreLabel = `${score} IQ`;
       reading = score >= 160
         ? "Big-brain energy."
         : score >= 110
-          ? "Sharp thinking today."
+          ? "Sharp thinking right now."
           : score >= 70
             ? "Steady everyday smarts."
-            : "Brain is buffering—try again tomorrow.";
+            : "Brain is buffering—check back in 30 minutes.";
       break;
     }
     default:
@@ -484,7 +489,7 @@ function auraMood(score: number): { color: number; title: string; reading: strin
     return {
       color: 0x9b59b6,
       title: "RADIANT AURA",
-      reading: "Your energy is glowing today. Keep being iconic.",
+      reading: "Your energy is glowing right now. Keep being iconic.",
       gifCategory: "happy",
     };
   }
@@ -500,7 +505,7 @@ function auraMood(score: number): { color: number; title: string; reading: strin
     return {
       color: 0x3498db,
       title: "MYSTERIOUS ENERGY",
-      reading: "A quiet, mysterious aura today. Your comeback arc is loading.",
+      reading: "A quiet, mysterious aura right now. Your comeback arc is loading.",
       gifCategory: "think",
     };
   }
@@ -734,7 +739,7 @@ export async function handleSocialAction(message: Message, actionName: SocialAct
   if (SCORE_ACTIONS.has(actionName)) {
     const avatarUrl = target.user.displayAvatarURL({ size: 256 });
     if (actionName === "aura") {
-      const score = dailyScore("aura", target.id, -1000, 1000);
+      const score = scoreEveryThirtyMinutes("aura", target.id, -1000, 1000);
       const mood = auraMood(score);
       const gif = await fetchAnimeGif(mood.gifCategory);
       await replyWithSocialEmbed(
@@ -927,7 +932,7 @@ export async function handleShip(message: Message): Promise<void> {
   }
 
   const pairKey = [firstUser.id, secondUser.id].sort().join(":");
-  const score = seededScore(`ship:${pairKey}`, 0, 100);
+  const score = scoreEveryThirtyMinutes("ship", pairKey, 0, 100);
   const filledHearts = Math.round(score / 10);
   const meter = `${"💖".repeat(filledHearts)}${"🤍".repeat(10 - filledHearts)}`;
   const verdict =

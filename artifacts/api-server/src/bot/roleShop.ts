@@ -15,6 +15,7 @@ import { logger } from "../lib/logger";
 
 const EMBED_COLOR = 0x2b2d31;
 const MAX_ROLE_PRICE = 2_147_483_647;
+const MAX_CREDIT_BALANCE = 2_147_483_647;
 const ROLES_PER_PAGE = 10;
 
 function replyEmbed(title: string, description: string): { embeds: EmbedBuilder[] } {
@@ -24,6 +25,82 @@ function replyEmbed(title: string, description: string): { embeds: EmbedBuilder[
 export async function handleCreditCommand(message: Message): Promise<void> {
   const guild = message.guild;
   if (!guild) return;
+
+  const [, action, , amountArgument] = message.content.trim().split(/\s+/);
+  if (action?.toLowerCase() === "give" || action?.toLowerCase() === "remove") {
+    const manager = message.member ?? await guild.members.fetch(message.author.id).catch(() => null);
+    if (!manager?.permissions.has(PermissionFlagsBits.ManageGuild) && !manager?.permissions.has(PermissionFlagsBits.Administrator)) {
+      await message.reply({
+        content: "You need **Manage Server** permission to adjust member credits.",
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+
+    const targetUser = message.mentions.users.first();
+    const amount = /^\d+$/.test(amountArgument ?? "") ? Number(amountArgument) : NaN;
+    if (!targetUser || !Number.isSafeInteger(amount) || amount < 1 || amount > MAX_CREDIT_BALANCE) {
+      await message.reply({
+        content: `Usage: \`!credits ${action.toLowerCase()} @user <amount>\` (amount: 1–${MAX_CREDIT_BALANCE.toLocaleString()}).`,
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+
+    const target = await guild.members.fetch(targetUser.id).catch(() => null);
+    if (!target) {
+      await message.reply({ content: "That user is not a member of this server.", allowedMentions: { parse: [], repliedUser: false } });
+      return;
+    }
+
+    const operation = action.toLowerCase() === "give" ? "give" : "remove";
+    const result = await db.transaction(async (tx) => {
+      await tx.insert(botMiningProfilesTable)
+        .values({ guildId: guild.id, userId: target.id })
+        .onConflictDoNothing();
+      const [profile] = await tx.select()
+        .from(botMiningProfilesTable)
+        .where(and(
+          eq(botMiningProfilesTable.guildId, guild.id),
+          eq(botMiningProfilesTable.userId, target.id),
+        ))
+        .for("update");
+      if (!profile) throw new Error("Could not load target credit profile");
+
+      const nextBalance = operation === "give" ? profile.coins + amount : profile.coins - amount;
+      if (operation === "remove" && nextBalance < 0) return { status: "insufficient" as const, balance: profile.coins };
+      if (nextBalance > MAX_CREDIT_BALANCE) return { status: "maximum" as const, balance: profile.coins };
+
+      await tx.update(botMiningProfilesTable)
+        .set({ coins: nextBalance, updatedAt: new Date() })
+        .where(and(
+          eq(botMiningProfilesTable.guildId, guild.id),
+          eq(botMiningProfilesTable.userId, target.id),
+        ));
+      return { status: "updated" as const, balance: nextBalance };
+    });
+
+    if (result.status === "insufficient") {
+      await message.reply({
+        content: `<@${target.id}> only has **${result.balance.toLocaleString()} credits**; cannot remove ${amount.toLocaleString()}.`,
+        allowedMentions: { users: [] },
+      });
+      return;
+    }
+    if (result.status === "maximum") {
+      await message.reply({
+        content: `That adjustment would exceed the maximum balance of **${MAX_CREDIT_BALANCE.toLocaleString()} credits**.`,
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+
+    await message.reply({
+      content: `<:16:1553581538074038372> ${operation === "give" ? "Added" : "Removed"} **${amount.toLocaleString()} credits** ${operation === "give" ? "to" : "from"} <@${target.id}>. New balance: **${result.balance.toLocaleString()} credits**.`,
+      allowedMentions: { users: [] },
+    });
+    return;
+  }
 
   try {
     const [profile] = await db

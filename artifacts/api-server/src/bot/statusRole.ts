@@ -163,6 +163,7 @@ async function syncStatusRole(
   member: GuildMember,
   settings: typeof botStatusRolesTable.$inferSelect,
   qualification: string | null,
+  logAddition = true,
 ): Promise<void> {
   const role = await guild.roles.fetch(settings.roleId).catch(() => null);
   if (!role) return;
@@ -177,6 +178,7 @@ async function syncStatusRole(
   if (alreadyHasRole) return;
 
   await member.roles.add(role, "Status trigger became active");
+  if (!logAddition) return;
   const channel = await guild.channels.fetch(settings.logChannelId).catch(() => null);
   if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) return;
 
@@ -211,5 +213,11 @@ export async function handleStatusRolePresenceUpdate(
     : null;
   const matchingTrigger = getMatchingTrigger(presence, settings.triggerTexts);
   if (oldPresence?.status !== "offline" && Boolean(previousTrigger) === Boolean(matchingTrigger)) return;
-  await syncStatusRole(guild, member, settings, matchingTrigger);
+  await syncStatusRole(
+    guild,
+    member,
+    settings,
+    matchingTrigger,
+    oldPresence?.status !== "offline",
+  );
 }
