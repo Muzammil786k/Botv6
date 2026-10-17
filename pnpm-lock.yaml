@@ -184,6 +184,9 @@ importers:
       cors:
         specifier: ^2.8.6
         version: 2.8.6
+      dejavu-fonts-ttf:
+        specifier: ^2.37.3
+        version: 2.37.3
       discord.js:
         specifier: ^14.26.4
         version: 14.26.4
@@ -2010,6 +2013,9 @@ packages:
 
   decimal.js-light@2.5.1:
     resolution: {integrity: sha512-qIMFpTMZmny+MMIitAB6D7iVPEorVw6YQRWkvarTkT4tBeSLLiHzcwj6q0MmYSFCiVpiqPJTJEYIrpcPzVEIvg==}
+
+  dejavu-fonts-ttf@2.37.3:
+    resolution: {integrity: sha512-f1hd7jJbeQa1VWcw+K2KrTXS50zTMaHpVC4XIKJpNcDeYR5ajMtj/iLlQDYNvLOKamUB3ARVVCf79lNwNVztSQ==}
 
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
@@ -4686,6 +4692,8 @@ snapshots:
       ms: 2.1.3
 
   decimal.js-light@2.5.1: {}
+
+  dejavu-fonts-ttf@2.37.3: {}
 
   detect-libc@2.1.2: {}
 

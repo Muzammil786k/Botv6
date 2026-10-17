@@ -270,6 +270,10 @@ const slashCommands = [
     .setDescription("Choose the channel where server games can be played.")
     .addChannelOption((o) => o.setName("channel").setDescription("Games text channel").addChannelTypes(ChannelType.GuildText).setRequired(true)),
   new SlashCommandBuilder()
+    .setName("setchatreward")
+    .setDescription("Choose where active chat rewards are announced.")
+    .addChannelOption((o) => o.setName("channel").setDescription("Reward announcement text channel").addChannelTypes(ChannelType.GuildText).setRequired(true)),
+  new SlashCommandBuilder()
     .setName("wbstop")
     .setDescription("Stop the current Word Bomb game."),
   new SlashCommandBuilder()
@@ -382,6 +386,10 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
     case "setgame": {
       const channel = interaction.options.getChannel("channel");
       return channel ? `!setgame <#${channel.id}>` : "!setgame status";
+    }
+    case "setchatreward": {
+      const channel = interaction.options.getChannel("channel");
+      return channel ? `!setchatreward <#${channel.id}>` : "!setchatreward status";
     }
     case "truthordare":
       return `!truthordare ${mentionContent(interaction, "user")}`.trim();

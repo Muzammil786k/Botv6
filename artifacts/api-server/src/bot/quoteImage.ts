@@ -1,5 +1,11 @@
-import { createCanvas, loadImage, type Image, type SKRSContext2D } from "@napi-rs/canvas";
+import { createRequire } from "node:module";
+import { createCanvas, GlobalFonts, loadImage, type Image, type SKRSContext2D } from "@napi-rs/canvas";
 import { logger } from "../lib/logger";
+
+const require = createRequire(import.meta.url);
+const FONT_FAMILY = '"Quote Sans", sans-serif';
+GlobalFonts.registerFromPath(require.resolve("dejavu-fonts-ttf/ttf/DejaVuSans.ttf"), "Quote Sans");
+GlobalFonts.registerFromPath(require.resolve("dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf"), "Quote Sans");
 
 const WIDTH = 1600;
 const HEIGHT = 630;
@@ -75,7 +81,7 @@ function drawAvatar(context: SKRSContext2D, avatar: Image | null, fallback: stri
     context.fillStyle = "#111111";
     context.fillRect(AVATAR_X, AVATAR_Y, AVATAR_SIZE, AVATAR_SIZE);
     context.fillStyle = "#ffffff";
-    context.font = "bold 112px Arial, sans-serif";
+    context.font = `bold 112px ${FONT_FAMILY}`;
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.fillText(fallback.slice(0, 1).toUpperCase(), centerX, centerY);
@@ -107,7 +113,7 @@ export async function renderQuoteImage(
   let lineHeight = Math.round(fontSize * 1.25);
   let lines: string[] = [];
   while (fontSize >= MIN_QUOTE_FONT_SIZE) {
-    context.font = `bold ${fontSize}px Arial, sans-serif`;
+    context.font = `bold ${fontSize}px ${FONT_FAMILY}`;
     lineHeight = Math.round(fontSize * 1.25);
     lines = wrapText(context, cleanQuote, QUOTE_WIDTH);
     if (lines.length * lineHeight <= QUOTE_HEIGHT) break;
@@ -128,17 +134,17 @@ export async function renderQuoteImage(
 
   const authorY = Math.min(QUOTE_TOP + QUOTE_HEIGHT + 38, textTop + textHeight + 46);
   context.textBaseline = "alphabetic";
-  context.font = "26px Arial, sans-serif";
+  context.font = `26px ${FONT_FAMILY}`;
   context.fillStyle = "#bdbdbd";
-  context.fillText(`- ${displayName}`.slice(0, 64), QUOTE_X, authorY);
-  context.font = "18px Arial, sans-serif";
+  context.fillText(`- ${displayName}`.slice(0, 64), QUOTE_X, authorY, QUOTE_WIDTH);
+  context.font = `18px ${FONT_FAMILY}`;
   context.fillStyle = "#777777";
-  context.fillText(`@${username}`.slice(0, 72), QUOTE_X, authorY + 36);
+  context.fillText(`@${username}`.slice(0, 72), QUOTE_X, authorY + 36, QUOTE_WIDTH);
 
   context.textAlign = "right";
-  context.font = "16px Arial, sans-serif";
+  context.font = `16px ${FONT_FAMILY}`;
   context.fillStyle = "#666666";
-  context.fillText("Hangouts | discord.gg/hangouts", WIDTH - 90, HEIGHT - 28);
+  context.fillText("Hangouts | discord.gg/hangouts", WIDTH - 90, HEIGHT - 28, WIDTH - 180);
 
   return canvas.encode("png");
 }
