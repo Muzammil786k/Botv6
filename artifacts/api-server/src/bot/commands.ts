@@ -47,7 +47,7 @@ import { handleSetGameCommand } from "./gameChannel";
 import { handleTruthOrDare } from "./truthordare";
 import { handleQuoteRoleCommand, handleSetQuoteCommand } from "./quoteChannel";
 import { handleCreditCommand, handleRoleShopCommand } from "./roleShop";
-import { awardChatCredits } from "./credits";
+import { awardChatCredits, handleActiveChatRewardChannelCommand } from "./credits";
 import { handleCreditDropCommand } from "./crates";
 import { handleCreditAirdropCommand } from "./creditAirdrop";
 import { handleEmbedCommand } from "./embeds";
@@ -85,6 +85,10 @@ export async function handleMessage(
 
   if (lower === "!creditdrop" || lower.startsWith("!creditdrop ")) {
     await handleCreditDropCommand(message);
+    return;
+  }
+  if (lower === "!setchatreward" || lower.startsWith("!setchatreward ")) {
+    await handleActiveChatRewardChannelCommand(message, content.split(/\s+/).slice(1));
     return;
   }
   if (lower === "!airdrop" || lower.startsWith("!airdrop ")) {

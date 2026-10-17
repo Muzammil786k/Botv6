@@ -18,6 +18,7 @@
 //   export type Post = typeof postsTable.$inferSelect;
 
 export * from "./bot-automations";
+export * from "./bot-active-chat-reward-settings";
 export * from "./bot-mining";
 export * from "./bot-social-roles";
 export * from "./bot-moderation-roles";
