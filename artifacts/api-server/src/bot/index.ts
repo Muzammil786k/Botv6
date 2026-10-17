@@ -20,6 +20,7 @@ import { handleCreditDropReaction, startCreditDropScheduler } from "./crates";
 import { handleCreditAirdropButton, startCreditAirdropScheduler } from "./creditAirdrop";
 import { handleStatusRolePresenceUpdate } from "./statusRole";
 import { handleGuildTagRoleUserUpdate } from "./guildTagRole";
+import { handleTruthOrDareModal } from "./truthordare";
 import {
   handleAutoEmergencyCommand,
   handleEmergencyBanAdd,
@@ -128,6 +129,17 @@ export function createBot(): Client {
   });
 
   client.on("interactionCreate", async (interaction) => {
+    if (interaction.isModalSubmit() && interaction.customId.startsWith("truthordare:submit:")) {
+      try {
+        await handleTruthOrDareModal(interaction);
+      } catch (err) {
+        logger.error({ err, customId: interaction.customId }, "Error handling custom Truth or Dare submission");
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "Could not submit your Truth or Dare. Please try again.", ephemeral: true }).catch(() => {});
+        }
+      }
+      return;
+    }
     if (
       (interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) &&
       interaction.customId.startsWith("embed-ui:")

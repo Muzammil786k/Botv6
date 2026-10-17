@@ -45,7 +45,7 @@ import { handleSocialRoleCommand } from "./socialRole";
 import { handleModerationRoleCommand } from "./moderationRole";
 import { handleSetGameCommand } from "./gameChannel";
 import { handleTruthOrDare } from "./truthordare";
-import { handleSetQuoteCommand } from "./quoteChannel";
+import { handleQuoteRoleCommand, handleSetQuoteCommand } from "./quoteChannel";
 import { handleCreditCommand, handleRoleShopCommand } from "./roleShop";
 import { awardChatCredits } from "./credits";
 import { handleCreditDropCommand } from "./crates";
@@ -190,6 +190,8 @@ export async function handleMessage(
     await handleQuote(message);
   } else if (lower === "!setquote" || lower.startsWith("!setquote ")) {
     await handleSetQuoteCommand(message, content.split(/\s+/).slice(1));
+  } else if (lower === "!quoterole" || lower.startsWith("!quoterole ")) {
+    await handleQuoteRoleCommand(message, content.split(/\s+/).slice(1));
   } else if (lower === "!role" || lower.startsWith("!role ")) {
     await handleRole(message);
   } else if (lower === "!nick" || lower.startsWith("!nick ")) {

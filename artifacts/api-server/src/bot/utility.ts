@@ -360,7 +360,6 @@ export async function handleQuote(message: Message): Promise<void> {
       embeds: [
         new EmbedBuilder()
           .setColor(0x000000)
-          .setDescription(`“${quote.slice(0, 4000)}”`)
           .setImage("attachment://quote.png"),
       ],
       files: [attachment],

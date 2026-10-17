@@ -40,3 +40,4 @@ export * from "./bot-status-roles";
 export * from "./bot-guild-tag-roles";
 export * from "./bot-emergency";
 export * from "./bot-scheduled-messages";
+export * from "./bot-quote-roles";

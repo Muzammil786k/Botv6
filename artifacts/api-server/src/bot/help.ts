@@ -151,6 +151,8 @@ function page4(): EmbedBuilder {
       { name: "`!timer <duration> [message]`", value: "Post a timer completion in this channel. Durations: `30s`, `5m`, `2h`, up to `7d`." },
       { name: "`!quote <text>` • `/quote`", value: "Create a clean black quote card with your avatar, display name, and username." },
       { name: "`!setquote #channel` • `/setquote channel`", value: "Restrict quote cards to one text channel. Check with `status` or clear with `remove`. *(Manage Server)*" },
+      { name: "`!quoterole set @role1 @role2`", value: "Require members to have any one of up to 10 roles to create quote cards. *(Manage Server)*" },
+      { name: "`!quoterole status` / `!quoterole remove`", value: "Show or remove the quote-role requirement. *(Manage Server)*" },
       { name: "`!steal` (reply to an emoji or sticker)", value: "Choose to add an emoji or PNG/APNG/GIF sticker from the replied-to message as a server emoji or sticker. Lottie stickers are converted to a still image. Requires **Create Expressions** permission and an available slot." },
     )
     .setFooter({ text: HELP_FOOTER });
@@ -193,9 +195,9 @@ function page5(): EmbedBuilder {
       { name: "`!wordbomb` / `!wb` • `/wordbomb`", value: "Start a Word Bomb game in the configured games channel. React ✅ to join. **10s** per turn, **3 lives** each. Real English words only!" },
       { name: "`!wbstop` / `!wordbomb stop` • `/wbstop`", value: "Stop the current Word Bomb game in the configured games channel. *(Manage Server)*" },
       { name: "`!wbtop` • `/wbtop`", value: "Show the Word Bomb win leaderboard in the configured games channel." },
-      { name: "`!truthordare [@user]` / `!tod` • `/truthordare`", value: "Let a player choose Truth or Dare. Available only in the configured games channel." },
+      { name: "`!truthordare [@user]` / `!tod` • `/truthordare`", value: "The selected player can choose a random Truth/Dare or write and submit their own prompt. Available only in the configured games channel." },
       { name: "✅ **Command notes**", value: "Slash commands appear server-by-server after the bot starts. Prefix commands continue to work as before.\n\nFor accurate online/offline presence counts, enable **Server Members Intent** and **Presence Intent** in the Discord Developer Portal." },
-      { name: "💳 **Credits**", value: "Check your balance with `!credit` or `!credits`. Earn **20 credits** from chat once per minute or **10–100 credits** in a reaction drop. Spend credits on server roles with `!shop` and `!shop buy @role`." },
+      { name: "💳 **Credits**", value: "Check your balance with `!credit` or `!credits`. Earn **20 credits** from chat once per minute, **10–100 credits** in a reaction drop, or different random rewards for two active chatters every 30 minutes (21+ messages each in the last 10 minutes): **Common 50**, **Rare 100**, or very rare **Epic 200 credits**. Spend credits on server roles with `!shop` and `!shop buy @role`." },
       { name: "🦉 **Credit drops**", value: "An Epic reaction drop appears every **30 minutes**. The first 🌦️ reaction wins **10–100 random credits**, added to the winner's balance. Server managers set the channel with `!creditdrop setup #channel`; change the interval with `!creditdrop interval 1h` (30m–24h). Check, pause, or resume with `!creditdrop status|pause|resume`." },
     )
     .setFooter({ text: HELP_FOOTER });
@@ -204,7 +206,7 @@ function page5(): EmbedBuilder {
 function pageEconomy(): EmbedBuilder {
   return helpPage("💰 Economy")
     .addFields(
-      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\n`!credits give @user <amount>` / `!credits remove @user <amount>` — adjust a member's balance (**Manage Server**).\nEarn credits through chat and credit drops." },
+      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\n`!credits give @user <amount>` / `!credits remove @user <amount>` — adjust a member's balance (**Manage Server**).\nTwo chatters with 21+ messages each in 10 minutes receive different tiers: **Common 50**, **Rare 100**, or very rare **Epic 200 credits**." },
       { name: "🎉 **Credit Airdrop**", value: "`!airdrop <credits> <duration>` / `/airdrop create` — start a timed drop with an Enter button. Everyone who joins splits the pot evenly; leftover credits are distributed one each. Example: `!airdrop 200 10m`. *(Manage Server)*" },
       { name: "🏷️ **Role shop**", value: "`!shop` — browse numbered role/price pages\n`!shop buy @role` — buy with credits\n`!shop add @role <price>` — add a listing\n`!shop edit @role <new-price>` — edit its price\n`!shop remove @role` — remove a listing (**Manage Server**)" },
     )
