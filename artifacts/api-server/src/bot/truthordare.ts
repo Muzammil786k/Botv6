@@ -4,7 +4,12 @@ import {
   ButtonStyle,
   ComponentType,
   EmbedBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  type ButtonInteraction,
   type Message,
+  type ModalSubmitInteraction,
 } from "discord.js";
 import { premiumColors } from "./presentation";
 import { requireGameChannel } from "./gameChannel";
@@ -62,6 +67,14 @@ export async function handleTruthOrDare(message: Message): Promise<void> {
           .setCustomId("truthordare:dare")
           .setLabel("Dare")
           .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+          .setCustomId("truthordare:write:truth")
+          .setLabel("Write Truth")
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId("truthordare:write:dare")
+          .setLabel("Write Dare")
+          .setStyle(ButtonStyle.Secondary),
       ),
     ],
     allowedMentions: { users: [target.id] },
@@ -75,6 +88,23 @@ export async function handleTruthOrDare(message: Message): Promise<void> {
   collector.on("collect", async (interaction) => {
     if (interaction.user.id !== target.id) {
       await interaction.reply({ content: "Only the selected player can choose Truth or Dare.", ephemeral: true });
+      return;
+    }
+
+    if (interaction.customId.startsWith("truthordare:write:")) {
+      const kind = interaction.customId.endsWith(":truth") ? "truth" : "dare";
+      const input = new TextInputBuilder()
+        .setCustomId("prompt")
+        .setLabel(`Write your own ${kind}`)
+        .setPlaceholder(kind === "truth" ? "Type your truth question..." : "Type your dare... ")
+        .setStyle(TextInputStyle.Paragraph)
+        .setMaxLength(500)
+        .setRequired(true);
+      const modal = new ModalBuilder()
+        .setCustomId(`truthordare:submit:${kind}:${target.id}:${promptMessage.channelId}:${promptMessage.id}`)
+        .setTitle(`Your own ${kind}`)
+        .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+      await interaction.showModal(modal);
       return;
     }
 
@@ -97,4 +127,42 @@ export async function handleTruthOrDare(message: Message): Promise<void> {
       await promptMessage.edit({ components: [] }).catch(() => {});
     }
   });
+}
+
+export async function handleTruthOrDareModal(interaction: ModalSubmitInteraction): Promise<void> {
+  const match = /^truthordare:submit:(truth|dare):(\d{17,20}):(\d{17,20}):(\d{17,20})$/.exec(interaction.customId);
+  if (!match) return;
+
+  const [, kind, targetId, channelId, messageId] = match;
+  if (interaction.user.id !== targetId) {
+    await interaction.reply({ content: "Only the selected player can submit this Truth or Dare.", ephemeral: true });
+    return;
+  }
+
+  const prompt = interaction.fields.getTextInputValue("prompt").trim();
+  if (!prompt) {
+    await interaction.reply({ content: "Please enter a Truth or Dare before submitting.", ephemeral: true });
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+  const channel = await interaction.client.channels.fetch(channelId).catch(() => null);
+  const promptMessage = channel?.isTextBased() && "messages" in channel
+    ? await channel.messages.fetch(messageId).catch(() => null)
+    : null;
+  if (!promptMessage) {
+    await interaction.editReply("This Truth or Dare prompt has expired.");
+    return;
+  }
+
+  await promptMessage.edit({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(premiumColors.brand)
+        .setDescription(`<@${targetId}> wrote their own **${kind}**:\n\n${prompt}`),
+    ],
+    components: [],
+    allowedMentions: { parse: [] },
+  });
+  await interaction.editReply(`Your custom ${kind} has been posted.`);
 }
