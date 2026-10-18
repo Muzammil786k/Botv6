@@ -49,7 +49,6 @@ import { handleQuoteRoleCommand, handleSetQuoteCommand } from "./quoteChannel";
 import { handleCreditCommand, handleRoleShopCommand } from "./roleShop";
 import { awardChatCredits, handleActiveChatRewardChannelCommand } from "./credits";
 import { handleCreditDropCommand } from "./crates";
-import { handleGamesCommand } from "./gameDrops";
 import { handleCreditAirdropCommand } from "./creditAirdrop";
 import { handleEmbedCommand } from "./embeds";
 import { handleStatusRoleCommand } from "./statusRole";
@@ -84,10 +83,6 @@ export async function handleMessage(
 
   const lower = content.toLowerCase();
 
-  if (lower === "!games") {
-    await handleGamesCommand(message);
-    return;
-  }
   if (lower === "!creditdrop" || lower.startsWith("!creditdrop ")) {
     await handleCreditDropCommand(message);
     return;

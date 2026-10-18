@@ -18,7 +18,6 @@ import { logger } from "../lib/logger";
 import { processUserMessageAutomations, sendMemberMessage } from "./automation";
 import { handleCreditDropReaction, startCreditDropScheduler } from "./crates";
 import { handleCreditAirdropButton, startCreditAirdropScheduler } from "./creditAirdrop";
-import { handleGameDropInteraction, startGameDropScheduler } from "./gameDrops";
 import { handleStatusRolePresenceUpdate } from "./statusRole";
 import { handleGuildTagRoleUserUpdate } from "./guildTagRole";
 import { handleTruthOrDareModal } from "./truthordare";
@@ -55,7 +54,6 @@ export function createBot(): Client {
     client.user?.setActivity("🎉 Giveaways | !help | /help");
     startCreditDropScheduler(client);
     startCreditAirdropScheduler(client);
-    startGameDropScheduler(client);
     startTempChannelCleanupScheduler(client);
     startReminderScheduler(client);
     void registerSlashCommands(client);
@@ -131,17 +129,6 @@ export function createBot(): Client {
   });
 
   client.on("interactionCreate", async (interaction) => {
-    if (interaction.isStringSelectMenu() && interaction.customId.startsWith("game-drop:")) {
-      try {
-        await handleGameDropInteraction(interaction);
-      } catch (err) {
-        logger.error({ err, customId: interaction.customId }, "Error handling game drop selection");
-        if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ content: "Could not start that game. Please try again on the next drop.", ephemeral: true }).catch(() => {});
-        }
-      }
-      return;
-    }
     if (interaction.isModalSubmit() && interaction.customId.startsWith("truthordare:submit:")) {
       try {
         await handleTruthOrDareModal(interaction);
