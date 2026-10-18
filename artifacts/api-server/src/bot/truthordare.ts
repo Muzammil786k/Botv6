@@ -86,12 +86,13 @@ export async function handleTruthOrDare(message: Message): Promise<void> {
   });
 
   collector.on("collect", async (interaction) => {
-    if (interaction.user.id !== target.id) {
+    const isCustomPrompt = interaction.customId.startsWith("truthordare:write:");
+    if (!isCustomPrompt && interaction.user.id !== target.id) {
       await interaction.reply({ content: "Only the selected player can choose Truth or Dare.", ephemeral: true });
       return;
     }
 
-    if (interaction.customId.startsWith("truthordare:write:")) {
+    if (isCustomPrompt) {
       const kind = interaction.customId.endsWith(":truth") ? "truth" : "dare";
       const input = new TextInputBuilder()
         .setCustomId("prompt")
@@ -101,7 +102,7 @@ export async function handleTruthOrDare(message: Message): Promise<void> {
         .setMaxLength(500)
         .setRequired(true);
       const modal = new ModalBuilder()
-        .setCustomId(`truthordare:submit:${kind}:${target.id}:${promptMessage.channelId}:${promptMessage.id}`)
+        .setCustomId(`truthordare:submit:${kind}:${promptMessage.channelId}:${promptMessage.id}`)
         .setTitle(`Your own ${kind}`)
         .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
       await interaction.showModal(modal);
@@ -130,14 +131,10 @@ export async function handleTruthOrDare(message: Message): Promise<void> {
 }
 
 export async function handleTruthOrDareModal(interaction: ModalSubmitInteraction): Promise<void> {
-  const match = /^truthordare:submit:(truth|dare):(\d{17,20}):(\d{17,20}):(\d{17,20})$/.exec(interaction.customId);
+  const match = /^truthordare:submit:(truth|dare):(\d{17,20}):(\d{17,20})$/.exec(interaction.customId);
   if (!match) return;
 
-  const [, kind, targetId, channelId, messageId] = match;
-  if (interaction.user.id !== targetId) {
-    await interaction.reply({ content: "Only the selected player can submit this Truth or Dare.", ephemeral: true });
-    return;
-  }
+  const [, kind, channelId, messageId] = match;
 
   const prompt = interaction.fields.getTextInputValue("prompt").trim();
   if (!prompt) {
@@ -159,10 +156,10 @@ export async function handleTruthOrDareModal(interaction: ModalSubmitInteraction
     embeds: [
       new EmbedBuilder()
         .setColor(premiumColors.brand)
-        .setDescription(`<@${targetId}> wrote their own **${kind}**:\n\n${prompt}`),
+        .setDescription(`<@${interaction.user.id}> got a custom **${kind}**:\n\n${prompt}`),
     ],
     components: [],
-    allowedMentions: { parse: [] },
+    allowedMentions: { users: [interaction.user.id] },
   });
   await interaction.editReply(`Your custom ${kind} has been posted.`);
 }

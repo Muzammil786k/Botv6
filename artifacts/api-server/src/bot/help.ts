@@ -191,6 +191,7 @@ function page5(): EmbedBuilder {
   return helpPage("🎮 Games")
     .addFields(
       { name: "💣 **Word Bomb**", value: "\u200b" },
+      { name: "`!games`", value: "List all games available in scheduled game drops." },
       { name: "`!setgame #channel` • `/setgame channel`", value: "Set the one channel where Word Bomb and Truth or Dare can be played. *(Manage Server)*" },
       { name: "`!wordbomb` / `!wb` • `/wordbomb`", value: "Start a Word Bomb game in the configured games channel. React ✅ to join. **10s** per turn, **3 lives** each. Real English words only!" },
       { name: "`!wbstop` / `!wordbomb stop` • `/wbstop`", value: "Stop the current Word Bomb game in the configured games channel. *(Manage Server)*" },
