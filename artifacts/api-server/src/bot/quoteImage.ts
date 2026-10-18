@@ -9,15 +9,15 @@ GlobalFonts.registerFromPath(require.resolve("dejavu-fonts-ttf/ttf/DejaVuSans-Bo
 
 const WIDTH = 1600;
 const HEIGHT = 630;
-const AVATAR_SIZE = 260;
+const AVATAR_SIZE = 290;
 const AVATAR_X = 100;
-const AVATAR_Y = 185;
-const QUOTE_X = 500;
+const AVATAR_Y = 170;
+const QUOTE_X = 530;
 const QUOTE_WIDTH = 1010;
 const QUOTE_TOP = 75;
 const QUOTE_HEIGHT = 355;
 const MIN_QUOTE_FONT_SIZE = 26;
-const MAX_QUOTE_FONT_SIZE = 54;
+const MAX_QUOTE_FONT_SIZE = 60;
 const MAX_QUOTE_LENGTH = 450;
 
 async function loadAvatar(url: string): Promise<Image | null> {

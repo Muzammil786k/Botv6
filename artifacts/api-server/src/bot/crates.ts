@@ -345,26 +345,10 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
         updatedAt: new Date(now),
       })
       .where(eq(botCrateSettingsTable.guildId, settings.guildId));
-    return { credits, balance, totalCreditDropsClaimed, reaction: expectedReaction };
+    return { credits, balance, totalCreditDropsClaimed };
   });
 
   if (!result) return;
-  try {
-    await reaction.message.edit({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0x9b59b6)
-          .setDescription(`✅ ${result.reaction} Claimed by <@${user.id}>`),
-      ],
-      allowedMentions: { users: [user.id] },
-    });
-  } catch (error) {
-    logger.error(
-      { err: error, guildId: reaction.message.guild.id, userId: user.id, messageId: reaction.message.id },
-      "Could not compact claimed credit drop",
-    );
-  }
-
   try {
     await reaction.message.reply({
       content: `<@${user.id}>`,
