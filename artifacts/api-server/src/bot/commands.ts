@@ -34,6 +34,7 @@ import { handleShip, handleSocialAction, SOCIAL_ACTIONS, type SocialActionName }
 import { handleSteal } from "./steal";
 import { handleAutoModeration, handleAutomodCommand } from "./moderation";
 import {
+  handleAutoResponderCommand,
   handleAutoReactCommand,
   handleStickyCommand,
   handleWelcomeCommand,
@@ -113,6 +114,8 @@ export async function handleMessage(
     await handleHelp(message);
 
   // ── Channel Automations ────────────────────────────────────────────────────
+  } else if (lower === "!autoresponder" || lower.startsWith("!autoresponder ")) {
+    await handleAutoResponderCommand(message);
   } else if (lower === "!autoreact" || lower.startsWith("!autoreact ")) {
     await handleAutoReactCommand(message);
   } else if (lower === "!sticky" || lower.startsWith("!sticky ")) {
@@ -214,7 +217,7 @@ export async function handleMessage(
     await handleWordbombStop(message);
   } else if (lower === "!wbtop") {
     await handleWbTop(message);
-  } else if (lower === "!credit" || lower === "!credits") {
+  } else if (lower === "!credit" || lower.startsWith("!credit ") || lower === "!credits" || lower.startsWith("!credits ")) {
     await handleCreditCommand(message);
   } else if (lower === "!shop" || lower.startsWith("!shop ")) {
     const args = content.split(/\s+/).slice(1);

@@ -6,6 +6,8 @@ export const botChannelAutomationsTable = pgTable(
     guildId: text("guild_id").notNull(),
     channelId: text("channel_id").notNull(),
     autoReactEmoji: text("auto_react_emoji"),
+    autoResponseTrigger: text("auto_response_trigger"),
+    autoResponseContent: text("auto_response_content"),
     stickyContent: text("sticky_content"),
     stickyMessageId: text("sticky_message_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

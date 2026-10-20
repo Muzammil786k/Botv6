@@ -98,8 +98,7 @@ async function maybeAwardRandomChatReward(message: Message, now: number): Promis
         embeds: [
           new EmbedBuilder()
             .setColor(reward.color)
-            .setAuthor({ name: chatter.displayName })
-            .setTitle("Congratulations!")
+            .setAuthor({ name: `Congratulations ${chatter.displayName}!` })
             .setDescription(`You won a ${reward.icon} **${reward.name} Reward** – <:credits:1558505663531851933> **__${reward.credits} Credits__**\nFor being active in chat.`)
             .setTimestamp(now),
         ],
