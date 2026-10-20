@@ -34,6 +34,7 @@ import { handleShip, handleSocialAction, SOCIAL_ACTIONS, type SocialActionName }
 import { handleSteal } from "./steal";
 import { handleAutoModeration, handleAutomodCommand } from "./moderation";
 import {
+  handleAutoResponderCommand,
   handleAutoReactCommand,
   handleStickyCommand,
   handleWelcomeCommand,
@@ -43,6 +44,8 @@ import { handleJtcCommand, handleVcCommand } from "./joinToCreate";
 import { handleTicketCommand } from "./tickets";
 import { handleSocialRoleCommand } from "./socialRole";
 import { handleModerationRoleCommand } from "./moderationRole";
+import { handleModerationLimitCommand } from "./moderationLimits";
+import { handleTopggVoteRewardCommand } from "./topggVoteCommands";
 import { handleSetGameCommand } from "./gameChannel";
 import { handleTruthOrDare } from "./truthordare";
 import { handleQuoteRoleCommand, handleSetQuoteCommand } from "./quoteChannel";
@@ -87,6 +90,10 @@ export async function handleMessage(
     await handleCreditDropCommand(message);
     return;
   }
+  if (lower === "!votereward" || lower.startsWith("!votereward ")) {
+    await handleTopggVoteRewardCommand(message, content.split(/\s+/).slice(1));
+    return;
+  }
   if (lower === "!setchatreward" || lower.startsWith("!setchatreward ")) {
     await handleActiveChatRewardChannelCommand(message, content.split(/\s+/).slice(1));
     return;
@@ -113,6 +120,8 @@ export async function handleMessage(
     await handleHelp(message);
 
   // ── Channel Automations ────────────────────────────────────────────────────
+  } else if (lower === "!autoresponder" || lower.startsWith("!autoresponder ")) {
+    await handleAutoResponderCommand(message);
   } else if (lower === "!autoreact" || lower.startsWith("!autoreact ")) {
     await handleAutoReactCommand(message);
   } else if (lower === "!sticky" || lower.startsWith("!sticky ")) {
@@ -134,6 +143,8 @@ export async function handleMessage(
     await handleAutomodCommand(message);
   } else if (lower === "!modrole" || lower.startsWith("!modrole ")) {
     await handleModerationRoleCommand(message, content.split(/\s+/).slice(1));
+  } else if (lower === "!modlimit" || lower.startsWith("!modlimit ")) {
+    await handleModerationLimitCommand(message, content.split(/\s+/).slice(1));
   } else if (lower === "!warn" || lower.startsWith("!warn ")) {
     await handleWarn(message);
   } else if (lower === "!warnings" || lower.startsWith("!warnings ")) {
@@ -214,7 +225,7 @@ export async function handleMessage(
     await handleWordbombStop(message);
   } else if (lower === "!wbtop") {
     await handleWbTop(message);
-  } else if (lower === "!credit" || lower === "!credits") {
+  } else if (lower === "!credit" || lower.startsWith("!credit ") || lower === "!credits" || lower.startsWith("!credits ")) {
     await handleCreditCommand(message);
   } else if (lower === "!shop" || lower.startsWith("!shop ")) {
     const args = content.split(/\s+/).slice(1);

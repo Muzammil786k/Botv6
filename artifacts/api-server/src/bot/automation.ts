@@ -101,7 +101,7 @@ export async function removeChannelAutoReact(
   const settings = await getChannelAutomationSettings(guildId, channelId);
   if (!settings?.autoReactEmoji) return false;
 
-  if (!settings.stickyContent) {
+  if (!settings.stickyContent && !settings.autoResponseTrigger && !settings.autoResponseContent) {
     await db
       .delete(botChannelAutomationsTable)
       .where(
@@ -120,6 +120,49 @@ export async function removeChannelAutoReact(
           eq(botChannelAutomationsTable.channelId, channelId),
         ),
       );
+  }
+  invalidateChannelSettings(guildId, channelId);
+  return true;
+}
+
+export async function setChannelAutoResponder(
+  guildId: string,
+  channelId: string,
+  trigger: string,
+  response: string,
+): Promise<void> {
+  await db
+    .insert(botChannelAutomationsTable)
+    .values({ guildId, channelId, autoResponseTrigger: trigger, autoResponseContent: response })
+    .onConflictDoUpdate({
+      target: [botChannelAutomationsTable.guildId, botChannelAutomationsTable.channelId],
+      set: { autoResponseTrigger: trigger, autoResponseContent: response, updatedAt: new Date() },
+    });
+  invalidateChannelSettings(guildId, channelId);
+}
+
+export async function removeChannelAutoResponder(
+  guildId: string,
+  channelId: string,
+): Promise<boolean> {
+  const settings = await getChannelAutomationSettings(guildId, channelId);
+  if (!settings?.autoResponseTrigger && !settings?.autoResponseContent) return false;
+
+  if (!settings.stickyContent && !settings.autoReactEmoji) {
+    await db
+      .delete(botChannelAutomationsTable)
+      .where(and(
+        eq(botChannelAutomationsTable.guildId, guildId),
+        eq(botChannelAutomationsTable.channelId, channelId),
+      ));
+  } else {
+    await db
+      .update(botChannelAutomationsTable)
+      .set({ autoResponseTrigger: null, autoResponseContent: null, updatedAt: new Date() })
+      .where(and(
+        eq(botChannelAutomationsTable.guildId, guildId),
+        eq(botChannelAutomationsTable.channelId, channelId),
+      ));
   }
   invalidateChannelSettings(guildId, channelId);
   return true;
@@ -147,7 +190,7 @@ export async function removeChannelSticky(
   const settings = await getChannelAutomationSettings(guildId, channelId);
   if (!settings?.stickyContent) return { removed: false, messageId: null };
 
-  if (!settings.autoReactEmoji) {
+  if (!settings.autoReactEmoji && !settings.autoResponseTrigger && !settings.autoResponseContent) {
     await db
       .delete(botChannelAutomationsTable)
       .where(
@@ -348,6 +391,25 @@ export async function processUserMessageAutomations(
       }
     }
 
+    if (
+      settings.autoResponseTrigger &&
+      settings.autoResponseContent &&
+      !message.author.bot &&
+      !message.content.trimStart().startsWith("!")
+    ) {
+      const escapedTrigger = settings.autoResponseTrigger.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const triggerPattern = new RegExp(
+        `(^|[^\\p{L}\\p{N}_])${escapedTrigger}(?=$|[^\\p{L}\\p{N}_])`,
+        "iu",
+      );
+      if (triggerPattern.test(message.content)) {
+        await message.reply({
+          content: settings.autoResponseContent,
+          allowedMentions: { parse: [] },
+        });
+      }
+    }
+
     if (settings.stickyContent && !message.author.bot) {
       await bumpStickyForChannel(client, message.guild.id, message.channelId);
     }
@@ -468,4 +530,6 @@ export async function sendMemberMessage(
 
 export const automationLimits = {
   maxStickyContentLength: MAX_STICKY_CONTENT_LENGTH,
+  maxAutoResponseTriggerLength: 100,
+  maxAutoResponseContentLength: 1_800,
 } as const;

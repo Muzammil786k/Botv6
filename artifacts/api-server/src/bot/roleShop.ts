@@ -4,6 +4,7 @@ import {
   ButtonStyle,
   ComponentType,
   EmbedBuilder,
+  type Guild,
   PermissionFlagsBits,
   type GuildMember,
   type Message,
@@ -27,7 +28,7 @@ export async function handleCreditCommand(message: Message): Promise<void> {
   if (!guild) return;
 
   const [, action, , amountArgument] = message.content.trim().split(/\s+/);
-  if (action?.toLowerCase() === "give" || action?.toLowerCase() === "remove") {
+  if (action?.toLowerCase() === "give" || action?.toLowerCase() === "add" || action?.toLowerCase() === "remove") {
     const manager = message.member ?? await guild.members.fetch(message.author.id).catch(() => null);
     if (!manager?.permissions.has(PermissionFlagsBits.ManageGuild) && !manager?.permissions.has(PermissionFlagsBits.Administrator)) {
       await message.reply({
@@ -53,7 +54,7 @@ export async function handleCreditCommand(message: Message): Promise<void> {
       return;
     }
 
-    const operation = action.toLowerCase() === "give" ? "give" : "remove";
+    const operation = action.toLowerCase() === "remove" ? "remove" : "give";
     const result = await db.transaction(async (tx) => {
       await tx.insert(botMiningProfilesTable)
         .values({ guildId: guild.id, userId: target.id })
@@ -128,13 +129,26 @@ function parseRoleId(value: string | undefined): string | null {
   return /^<@&(\d{17,20})>$/.exec(value)?.[1] ?? (/^\d{17,20}$/.test(value) ? value : null);
 }
 
-async function canAssignRole(member: GuildMember, role: Role): Promise<boolean> {
-  if (role.id === member.guild.id || role.managed) return false;
-  const botMember = await member.guild.members.fetchMe().catch(() => null);
+async function canAssignRole(guild: Guild, role: Role): Promise<boolean> {
+  if (role.id === guild.id || role.managed) return false;
+  const botMember = await guild.members.fetchMe().catch(() => null);
   if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) return false;
   if (botMember.roles.highest.comparePositionTo(role) <= 0) return false;
-  if (!member.permissions.has(PermissionFlagsBits.Administrator) && member.roles.highest.comparePositionTo(role) <= 0) return false;
   return true;
+}
+
+async function resolveShopRole(guild: Guild, message: Message, input: string): Promise<Role | null> {
+  const mentionedRole = message.mentions.roles.first();
+  if (mentionedRole) return mentionedRole;
+
+  const roleId = parseRoleId(input);
+  if (roleId) return guild.roles.fetch(roleId).catch(() => null);
+
+  const roleName = input.replace(/^["']|["']$/g, "").trim().toLocaleLowerCase();
+  if (!roleName) return null;
+  await guild.roles.fetch().catch(() => null);
+  const matches = guild.roles.cache.filter((role) => role.name.toLocaleLowerCase() === roleName);
+  return matches.size === 1 ? matches.first() ?? null : null;
 }
 
 async function refundCredits(guildId: string, userId: string, amount: number): Promise<void> {
@@ -173,7 +187,7 @@ export async function handleRoleShopCommand(message: Message, args: string[]): P
         await message.reply("Usage: `!shop add @role <price in credits>` (example: `!shop add @VIP 50000`).");
         return;
       }
-      if (!(await canAssignRole(member, role))) {
+      if (!(await canAssignRole(guild, role))) {
         await message.reply(replyEmbed("Role shop", "I or you cannot manage that role. Check Manage Roles permission and role hierarchy."));
         return;
       }
@@ -201,7 +215,7 @@ export async function handleRoleShopCommand(message: Message, args: string[]): P
         await message.reply("Usage: `!shop edit @role <new-price>` (example: `!shop edit @VIP 75000`).");
         return;
       }
-      if (!(await canAssignRole(member, role))) {
+      if (!(await canAssignRole(guild, role))) {
         await message.reply(replyEmbed("Role shop", "I or you cannot manage that role. Check Manage Roles permission and role hierarchy."));
         return;
       }
@@ -237,19 +251,19 @@ export async function handleRoleShopCommand(message: Message, args: string[]): P
       return;
     }
 
-    if (subcommand === "buy") {
-      const roleId = message.mentions.roles.first()?.id ?? parseRoleId(args[1]);
-      const role = roleId ? await guild.roles.fetch(roleId).catch(() => null) : null;
+    if (subcommand === "buy" || subcommand === "role") {
+      const roleInput = args.slice(1).join(" ").trim();
+      const role = await resolveShopRole(guild, message, roleInput);
       if (!role) {
-        await message.reply("Usage: `!shop buy @role`.");
+        await message.reply("Usage: `!shop buy @role`, `!shop buy Role Name`, or `!shop role Role Name`.");
         return;
       }
       if (member.roles.cache.has(role.id)) {
         await message.reply(replyEmbed("Role shop", `You already have ${role}.`));
         return;
       }
-      if (!(await canAssignRole(member, role))) {
-        await message.reply(replyEmbed("Role shop", "That role cannot be assigned. Please contact a server administrator."));
+      if (!(await canAssignRole(guild, role))) {
+        await message.reply(replyEmbed("Role shop", "I can't assign this role. A server admin must give me **Manage Roles** and move my highest role above it. Managed/integration roles can't be assigned by bots."));
         return;
       }
 

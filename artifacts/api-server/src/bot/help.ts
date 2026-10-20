@@ -102,6 +102,7 @@ function page2(): EmbedBuilder {
       { name: "`!unmute @user` • `/unmute`", value: "Remove a member timeout. Requires the configured moderation role." },
       { name: "`!kick @user [reason]` • `/kick`", value: "Kick a member.\n*(Kick Members)*" },
       { name: "`!ban @user|<user_id> [reason]` • `/ban`", value: "Ban a server member by mention or Discord user ID; delete their messages from the past 7 days.\n*(Ban Members)*" },
+      { name: "`!modlimit set @user kick <count> ban <count>`", value: "Set cumulative kick/ban limits for a moderator. Check with `!modlimit status @user`, reset usage with `!modlimit reset @user [kick|ban]`, or remove limits with `!modlimit remove @user`. *(Manage Server)*" },
       { name: "`!unban <user_id>` • `/unban`", value: "Unban a user by ID.\n*(Ban Members)*" },
       { name: "`!nuke` • `/nuke`", value: "Clone the channel and delete the old one. Confirmation required.\n*(Manage Channels)*" },
       { name: "`!slowmode <seconds>` • `/slowmode`", value: "Set slowmode from 0 to 21600 seconds.\n*(Manage Channels)*" },
@@ -122,7 +123,7 @@ function page3(): EmbedBuilder {
       { name: "`!socialrole set @role1 @role2...` • `/socialrole set`", value: "Require any one of several server roles to use social actions like `!kiss` and `!hug`. Check `status` or clear with `remove|clear|off`.\n*(Manage Server)*" },
       { name: "`!role @user @role|Role Name` • `/role`", value: "Add or remove a role using its mention or exact name (including spaces).\n*(Manage Roles)*" },
       { name: "`!nick @user <name|reset>` • `/nick`", value: "Change or reset a member nickname.\n*(Manage Nicknames)*" },
-      { name: "`!announce #channel <message>` • `/announce`", value: "Send an announcement embed to a channel.\n*(Manage Server)*" },
+      { name: "`!announce #channel <message>` • `/announce` • `/send`", value: "Send an announcement embed to a channel.\n*(Manage Server)*" },
       { name: "`!embed`", value: "Create named embeds with title, description, hex color, images, thumbnails, footer and fields; preview with `show` and post with `send`. Customize command-response embeds separately with `!embed override`; reset with `override-reset`.\n*(Manage Server)*" },
       { name: "`!voice help` • `!v help` • `/voice help`", value: "Manage your Join to Create channel: `info` `bump` `lock` `unlock` `name <name>` `size <n>` `bitrate <kbps>` `permit|unpermit @user` `kick|ban|unban @user` `unbanall` `reset` `claim` `transfer @user`. `!vc` remains an alias. Channel controls are owner-only; `info`, `claim`, and help are available to everyone." },
       { name: "`!jtc set #lobby [#category]` • `/jtc set`", value: "Choose the Join to Create lobby voice channel and optional category.\n*(Manage Server)*" },
@@ -162,6 +163,7 @@ function pageAutomation(): EmbedBuilder {
   return helpPage("📡 Automation")
     .setDescription("Configure these features with **Manage Server** permission.")
     .addFields(
+      { name: "`!autoresponder set #channel trigger => response`", value: "Automatically reply when a message contains the trigger as a whole word or phrase. Check with `status`; turn off with `remove`. *(Manage Server)*" },
       { name: "`!autoreact set #channel <emoji> [trigger text]` • `/autoreact set`", value: "With no trigger text, react to every user message. Add a phrase to react only when a user or bot message contains it, e.g. `!autoreact set #chat 🎉 \"leveled up\"`. Matching ignores letter case." },
       { name: "`!autoreact status #channel` • `/autoreact status`", value: "Show the active reaction for a channel." },
       { name: "`!autoreact remove #channel` • `/autoreact remove`", value: "Turn off auto-react for a channel." },
@@ -198,7 +200,7 @@ function page5(): EmbedBuilder {
       { name: "`!truthordare [@user]` / `!tod` • `/truthordare`", value: "The selected player can choose a random Truth/Dare or write and submit their own prompt. Available only in the configured games channel." },
       { name: "✅ **Command notes**", value: "Slash commands appear server-by-server after the bot starts. Prefix commands continue to work as before.\n\nFor accurate online/offline presence counts, enable **Server Members Intent** and **Presence Intent** in the Discord Developer Portal." },
       { name: "💳 **Credits**", value: "Check your balance with `!credit` or `!credits`. Earn **20 credits** from chat once per minute, **10–100 credits** in a reaction drop, or different random rewards for two active chatters every 30 minutes (21+ messages each in the last 10 minutes): **Common 50**, **Rare 100**, or very rare **Epic 200 credits**. Set their announcement channel with `!setchatreward #channel` or `/setchatreward`; check with `status`, or clear with `remove`. Spend credits on server roles with `!shop` and `!shop buy @role`." },
-      { name: "🦉 **Credit drops**", value: "An Epic reaction drop appears every **30 minutes**. The first 🌦️ reaction wins **10–100 random credits**, added to the winner's balance. Server managers set the channel with `!creditdrop setup #channel`; change the interval with `!creditdrop interval 1h` (30m–24h). Check, pause, or resume with `!creditdrop status|pause|resume`." },
+      { name: "🦉 **Credit drops**", value: "A random rarity drop appears on the configured interval. The first correct reaction wins **Common: 50–100**, **Rare: 100–200**, or **Mythic: 200–300 credits**. Server managers set the channel with `!creditdrop setup #channel`; change the interval with `!creditdrop interval 1h` (30m–24h). Check, pause, or resume with `!creditdrop status|pause|resume`." },
     )
     .setFooter({ text: HELP_FOOTER });
 }
@@ -206,9 +208,10 @@ function page5(): EmbedBuilder {
 function pageEconomy(): EmbedBuilder {
   return helpPage("💰 Economy")
     .addFields(
-      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\n`!credits give @user <amount>` / `!credits remove @user <amount>` — adjust a member's balance (**Manage Server**).\nTwo chatters with 21+ messages each in 10 minutes receive different tiers: **Common 50**, **Rare 100**, or very rare **Epic 200 credits**." },
+      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\n`!credits add @user <amount>` / `give` / `remove` — adjust a member's balance (**Manage Server**).\nTwo chatters with 21+ messages each in 10 minutes receive different tiers: **Common 50**, **Rare 100**, or very rare **Epic 200 credits**." },
       { name: "🎉 **Credit Airdrop**", value: "`!airdrop <credits> <duration>` / `/airdrop create` — start a timed drop with an Enter button. Everyone who joins splits the pot evenly; leftover credits are distributed one each. Example: `!airdrop 200 10m`. *(Manage Server)*" },
-      { name: "🏷️ **Role shop**", value: "`!shop` — browse numbered role/price pages\n`!shop buy @role` — buy with credits\n`!shop add @role <price>` — add a listing\n`!shop edit @role <new-price>` — edit its price\n`!shop remove @role` — remove a listing (**Manage Server**)" },
+      { name: "🗳️ **Vote Rewards**", value: "Configure Top.gg and Discadia separately with `!votereward topgg|discadia enable|disable`, `credits <amount>`, and `role <role-id> permanent|<duration>`. Customize shared or platform-specific reward DMs with `!votereward embed <shared|topgg|discadia> set <field> <value>`; preview with `!votereward embed <target> preview`. *(Manage Server)*" },
+      { name: "🏷️ **Role shop**", value: "`!shop` — browse numbered role/price pages\n`!shop buy @role` or `!shop buy Role Name` — buy with credits\n`!shop role @role` — buy a listed role\n`!shop add @role <price>` — add a listing\n`!shop edit @role <new-price>` — edit its price\n`!shop remove @role` — remove a listing (**Manage Server**)" },
     )
     .setFooter({ text: HELP_FOOTER });
 }

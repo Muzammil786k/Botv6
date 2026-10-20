@@ -13,10 +13,12 @@ import {
   bumpStickyForChannel,
   describeAutoReact,
   getChannelAutomationSettings,
+  removeChannelAutoResponder,
   removeChannelAutoReact,
   removeChannelSticky,
   removeGuildMessage,
   setChannelAutoReact,
+  setChannelAutoResponder,
   setChannelSticky,
   setGuildMessage,
 } from "./automation";
@@ -71,6 +73,85 @@ async function saveFailure(message: Message, feature: string, error: unknown): P
 
 function welcomeEmbedName(template: string): string | null {
   return /\{\{?embed:([a-z0-9_-]{1,32})\}\}?/i.exec(template)?.[1]?.toLowerCase() ?? null;
+}
+
+export async function handleAutoResponderCommand(message: Message): Promise<void> {
+  if (!message.guild || !(await requireManageServer(message))) return;
+
+  const action = message.content.trim().split(/\s+/)[1]?.toLowerCase();
+  const channel = mentionedTextChannel(message);
+  if (!channel) {
+    await message.reply({
+      content: "Usage: `!autoresponder set #channel trigger => response`, `!autoresponder status #channel`, or `!autoresponder remove #channel`.",
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+
+  if (action === "set") {
+    const config = textAfterChannelMention(message, channel);
+    const separatorIndex = config.indexOf("=>");
+    const rawTrigger = separatorIndex < 0 ? "" : config.slice(0, separatorIndex).trim();
+    const quotedTrigger = /^(?:"([\s\S]*)"|'([\s\S]*)')$/.exec(rawTrigger);
+    const trigger = (quotedTrigger?.[1] ?? quotedTrigger?.[2] ?? rawTrigger).trim();
+    const response = separatorIndex < 0 ? "" : config.slice(separatorIndex + 2).trim();
+    if (
+      !trigger || trigger.length > automationLimits.maxAutoResponseTriggerLength ||
+      !response || response.length > automationLimits.maxAutoResponseContentLength
+    ) {
+      await message.reply({
+        content: `❌ Provide a trigger (up to ${automationLimits.maxAutoResponseTriggerLength} characters) and response (up to ${automationLimits.maxAutoResponseContentLength} characters). Example: \`!autoresponder set #chat hello => Hi there!\`.`,
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+
+    try {
+      await setChannelAutoResponder(message.guild.id, channel.id, trigger, response);
+      await message.reply({
+        content: `✅ Auto-responder in ${channel} will reply to **${trigger}**.`,
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    } catch (error) {
+      await saveFailure(message, "auto-responder", error);
+    }
+    return;
+  }
+
+  if (action === "status") {
+    try {
+      const settings = await getChannelAutomationSettings(message.guild.id, channel.id);
+      await message.reply({
+        content: settings?.autoResponseTrigger && settings.autoResponseContent
+          ? `💬 Auto-responder is on in ${channel}. Trigger: **${settings.autoResponseTrigger}**\nResponse: ${settings.autoResponseContent}`
+          : `ℹ️ Auto-responder is off in ${channel}.`,
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    } catch (error) {
+      await saveFailure(message, "auto-responder", error);
+    }
+    return;
+  }
+
+  if (action === "remove" || action === "disable") {
+    try {
+      const removed = await removeChannelAutoResponder(message.guild.id, channel.id);
+      await message.reply({
+        content: removed
+          ? `✅ Auto-responder removed from ${channel}.`
+          : `ℹ️ No auto-responder is configured in ${channel}.`,
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    } catch (error) {
+      await saveFailure(message, "auto-responder", error);
+    }
+    return;
+  }
+
+  await message.reply({
+    content: "Usage: `!autoresponder set #channel trigger => response`, `!autoresponder status #channel`, or `!autoresponder remove #channel`.",
+    allowedMentions: { parse: [], repliedUser: false },
+  });
 }
 
 export async function handleAutoReactCommand(message: Message): Promise<void> {
@@ -242,7 +323,6 @@ export async function handleStickyCommand(
 
     try {
       await setChannelSticky(message.guild.id, channel.id, content);
-      await bumpStickyForChannel(client, message.guild.id, channel.id);
       await message.reply({
         content: `✅ Sticky message set for ${channel}. It will be moved to the bottom after each new message.`,
         allowedMentions: { parse: [], repliedUser: false },

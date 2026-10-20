@@ -8,15 +8,10 @@ import {
   type ButtonInteraction,
   type Guild,
   type Message,
-  type TextChannel,
 } from "discord.js";
 import { and, eq } from "drizzle-orm";
 import { db, botTicketSettingsTable, botTicketsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
-
-function isTicketChannel(channel: { name?: string } | null | undefined): boolean {
-  return !!channel && typeof channel.name === "string" && channel.name.startsWith("ticket-");
-}
 
 function formatTicketName(userName: string): string {
   const sanitized = userName.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
@@ -40,7 +35,7 @@ function parseTicketCategory(guild: Guild, raw: string | undefined): string | nu
 export async function handleTicketCommand(message: Message, args: string[]): Promise<void> {
   if (!message.guild) return;
 
-  const member = message.guild.members.cache.get(message.author.id);
+  const member = message.member ?? await message.guild.members.fetch(message.author.id).catch(() => null);
   const sub = args[0]?.toLowerCase() ?? "help";
 
   if (sub === "setup" || sub === "set" || sub === "config") {
@@ -90,7 +85,13 @@ export async function handleTicketCommand(message: Message, args: string[]): Pro
   }
 
   if (sub === "close") {
-    const channel = message.channel as TextChannel;
+    const channel = message.channel;
+    if (!channel.isTextBased() || !("guildId" in channel) || channel.guildId !== message.guild.id) {
+      await message.reply({
+        embeds: [new EmbedBuilder().setColor(0x5865f2).setDescription("❌ Tickets can only be closed from their server text channel.")],
+      });
+      return;
+    }
     const [ticket] = await db
       .select({ ownerId: botTicketsTable.ownerId })
       .from(botTicketsTable)
@@ -99,7 +100,7 @@ export async function handleTicketCommand(message: Message, args: string[]): Pro
     const ownerId = ticket?.ownerId;
     const canClose = ownerId === message.author.id || hasManageGuildPermission(member);
 
-    if (!isTicketChannel(channel) || (!canClose && !hasManageGuildPermission(member))) {
+    if (!ownerId || !canClose) {
       await message.reply({
         embeds: [new EmbedBuilder().setColor(0x5865f2).setDescription("❌ This is not a ticket channel, or you do not own it.")],
       });
@@ -161,6 +162,12 @@ export async function handleTicketCommand(message: Message, args: string[]): Pro
       return;
     }
 
+    const botMember = await message.guild.members.fetchMe().catch(() => null);
+    if (!botMember?.permissions.has(PermissionFlagsBits.ManageChannels)) {
+      await message.reply("❌ I need **Manage Channels** permission to open private tickets.");
+      return;
+    }
+
     const ticketName = formatTicketName(`${message.author.username}-${Date.now().toString().slice(-4)}`);
     const created = await message.guild.channels.create({
       name: ticketName,
@@ -178,6 +185,14 @@ export async function handleTicketCommand(message: Message, args: string[]): Pro
             PermissionFlagsBits.SendMessages,
             PermissionFlagsBits.ReadMessageHistory,
             PermissionFlagsBits.AddReactions,
+          ],
+        },
+        {
+          id: botMember.id,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory,
           ],
         },
       ],
@@ -215,19 +230,27 @@ export async function handleTicketCommand(message: Message, args: string[]): Pro
       new ButtonBuilder().setCustomId(`ticket:close:${created.id}`).setLabel("Close Ticket").setStyle(ButtonStyle.Danger),
     );
 
-    await created.send({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0x2b2d31)
-          .setTitle("🎫 Support ticket")
-          .setDescription(`Hi <@${message.author.id}>, your ticket has been created.\nPlease describe your issue and a staff member will assist you.`)
-          .addFields(
-            { name: "Opened by", value: `<@${message.author.id}>`, inline: true },
-            { name: "Status", value: "Open", inline: true },
-          ),
-      ],
-      components: [row],
-    });
+    try {
+      await created.send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0x2b2d31)
+            .setTitle("🎫 Support ticket")
+            .setDescription(`Hi <@${message.author.id}>, your ticket has been created.\nPlease describe your issue and a staff member will assist you.`)
+            .addFields(
+              { name: "Opened by", value: `<@${message.author.id}>`, inline: true },
+              { name: "Status", value: "Open", inline: true },
+            ),
+        ],
+        components: [row],
+      });
+    } catch (err) {
+      logger.error({ err, guildId: message.guild.id, channelId: created.id }, "Could not send ticket welcome message");
+      await db.delete(botTicketsTable).where(eq(botTicketsTable.channelId, created.id)).catch(() => {});
+      await created.delete("Ticket setup failed").catch(() => {});
+      await message.reply("❌ I couldn't send the ticket welcome message. Check my channel permissions and try again.");
+      return;
+    }
 
     await message.reply({
       embeds: [new EmbedBuilder().setColor(0x5865f2).setDescription(`✅ Ticket created: <#${created.id}>`)],
@@ -254,15 +277,14 @@ export async function handleTicketInteraction(interaction: ButtonInteraction): P
   if (!interaction.isButton() || !interaction.customId.startsWith("ticket:close:")) return;
 
   const channelId = interaction.customId.replace("ticket:close:", "");
-  const channel = interaction.guild?.channels.cache.get(channelId);
-  if (!channel || !channel.isTextBased() || !isTicketChannel(channel)) {
-    await interaction.reply({ content: "This ticket no longer exists.", ephemeral: true });
-    return;
-  }
-
   const guild = interaction.guild;
   if (!guild) {
     await interaction.reply({ content: "This ticket can only be closed inside a server.", ephemeral: true });
+    return;
+  }
+  const channel = guild.channels.cache.get(channelId);
+  if (!channel || !channel.isTextBased()) {
+    await interaction.reply({ content: "This ticket no longer exists.", ephemeral: true });
     return;
   }
   const [ticket] = await db
@@ -271,12 +293,14 @@ export async function handleTicketInteraction(interaction: ButtonInteraction): P
     .where(and(eq(botTicketsTable.channelId, channel.id), eq(botTicketsTable.guildId, guild.id)))
     .limit(1);
   const ownerId = ticket?.ownerId;
-  const member = interaction.member as any;
-  const permissions = member?.permissions;
+  if (!ownerId) {
+    await interaction.reply({ content: "This ticket no longer exists.", ephemeral: true });
+    return;
+  }
+  const permissions = interaction.memberPermissions;
   const canClose = !!(
-    member &&
-    (member.user.id === ownerId ||
-      (permissions && typeof permissions.has === "function" && permissions.has(PermissionFlagsBits.ManageGuild)))
+    interaction.user.id === ownerId ||
+    permissions?.has(PermissionFlagsBits.ManageGuild)
   );
 
   if (!canClose) {

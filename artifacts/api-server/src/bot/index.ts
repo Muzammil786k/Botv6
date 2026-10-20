@@ -21,6 +21,8 @@ import { handleCreditAirdropButton, startCreditAirdropScheduler } from "./credit
 import { handleStatusRolePresenceUpdate } from "./statusRole";
 import { handleGuildTagRoleUserUpdate } from "./guildTagRole";
 import { handleTruthOrDareModal } from "./truthordare";
+import { startTopggVoteWorker } from "./topggVotes";
+import { startDiscadiaVoteWorker } from "./discadiaVotes";
 import {
   handleAutoEmergencyCommand,
   handleEmergencyBanAdd,
@@ -53,6 +55,8 @@ export function createBot(): Client {
     logger.info({ tag: client.user?.tag }, "Discord bot is ready");
     client.user?.setActivity("🎉 Giveaways | !help | /help");
     startCreditDropScheduler(client);
+    startTopggVoteWorker(client);
+    startDiscadiaVoteWorker(client);
     startCreditAirdropScheduler(client);
     startTempChannelCleanupScheduler(client);
     startReminderScheduler(client);
