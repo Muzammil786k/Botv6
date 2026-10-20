@@ -8,16 +8,14 @@ GlobalFonts.registerFromPath(require.resolve("dejavu-fonts-ttf/ttf/DejaVuSans.tt
 GlobalFonts.registerFromPath(require.resolve("dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf"), "Quote Sans");
 
 const WIDTH = 1600;
-const HEIGHT = 630;
-const AVATAR_SIZE = 290;
-const AVATAR_X = 100;
-const AVATAR_Y = 170;
-const QUOTE_X = 530;
-const QUOTE_WIDTH = 1010;
-const QUOTE_TOP = 75;
-const QUOTE_HEIGHT = 355;
-const MIN_QUOTE_FONT_SIZE = 26;
-const MAX_QUOTE_FONT_SIZE = 60;
+const HEIGHT = 900;
+const AVATAR_WIDTH = 1020;
+const QUOTE_X = 810;
+const QUOTE_WIDTH = 700;
+const QUOTE_TOP = 300;
+const QUOTE_HEIGHT = 365;
+const MIN_QUOTE_FONT_SIZE = 20;
+const MAX_QUOTE_FONT_SIZE = 56;
 const MAX_QUOTE_LENGTH = 450;
 
 async function loadAvatar(url: string): Promise<Image | null> {
@@ -68,31 +66,43 @@ function wrapText(context: SKRSContext2D, text: string, maxWidth: number): strin
 }
 
 function drawAvatar(context: SKRSContext2D, avatar: Image | null, fallback: string): void {
-  const centerX = AVATAR_X + AVATAR_SIZE / 2;
-  const centerY = AVATAR_Y + AVATAR_SIZE / 2;
-
-  context.save();
-  context.beginPath();
-  context.arc(centerX, centerY, AVATAR_SIZE / 2, 0, Math.PI * 2);
-  context.clip();
   if (avatar) {
-    context.drawImage(avatar, AVATAR_X, AVATAR_Y, AVATAR_SIZE, AVATAR_SIZE);
+    const scale = Math.max(AVATAR_WIDTH / avatar.width, HEIGHT / avatar.height);
+    const sourceWidth = AVATAR_WIDTH / scale;
+    const sourceHeight = HEIGHT / scale;
+    const sourceX = (avatar.width - sourceWidth) / 2;
+    const sourceY = (avatar.height - sourceHeight) / 2;
+    context.save();
+    context.filter = "grayscale(100%) brightness(0.68) contrast(1.12)";
+    context.drawImage(
+      avatar,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      AVATAR_WIDTH,
+      HEIGHT,
+    );
+    context.restore();
   } else {
     context.fillStyle = "#111111";
-    context.fillRect(AVATAR_X, AVATAR_Y, AVATAR_SIZE, AVATAR_SIZE);
-    context.fillStyle = "#ffffff";
-    context.font = `bold 112px ${FONT_FAMILY}`;
+    context.fillRect(0, 0, AVATAR_WIDTH, HEIGHT);
+    context.fillStyle = "#777777";
+    context.font = `bold 260px ${FONT_FAMILY}`;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillText(fallback.slice(0, 1).toUpperCase(), centerX, centerY);
+    context.fillText(fallback.slice(0, 1).toUpperCase(), AVATAR_WIDTH / 2, HEIGHT / 2);
   }
-  context.restore();
 
-  context.beginPath();
-  context.arc(centerX, centerY, AVATAR_SIZE / 2, 0, Math.PI * 2);
-  context.strokeStyle = "#2a2a2a";
-  context.lineWidth = 2;
-  context.stroke();
+  const gradient = context.createLinearGradient(AVATAR_WIDTH * 0.48, 0, AVATAR_WIDTH + 180, 0);
+  gradient.addColorStop(0, "rgba(0, 0, 0, 0)");
+  gradient.addColorStop(0.4, "rgba(0, 0, 0, 0.28)");
+  gradient.addColorStop(0.82, "rgba(0, 0, 0, 0.94)");
+  gradient.addColorStop(1, "#000000");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, WIDTH, HEIGHT);
 }
 
 export async function renderQuoteImage(
@@ -109,6 +119,12 @@ export async function renderQuoteImage(
   drawAvatar(context, await loadAvatar(avatarUrl), username);
 
   const cleanQuote = Array.from(quote.trim()).slice(0, MAX_QUOTE_LENGTH).join("");
+  context.textAlign = "left";
+  context.textBaseline = "alphabetic";
+  context.fillStyle = "#555555";
+  context.font = `bold 150px ${FONT_FAMILY}`;
+  context.fillText("“", QUOTE_X - 5, 250);
+
   let fontSize = MAX_QUOTE_FONT_SIZE;
   let lineHeight = Math.round(fontSize * 1.25);
   let lines: string[] = [];
@@ -120,31 +136,41 @@ export async function renderQuoteImage(
     if (fontSize === MIN_QUOTE_FONT_SIZE) break;
     fontSize -= 2;
   }
+  const maxLines = Math.floor(QUOTE_HEIGHT / lineHeight);
+  if (lines.length > maxLines) {
+    lines = lines.slice(0, maxLines);
+    let lastLine = lines[maxLines - 1]!;
+    while (context.measureText(`${lastLine}…`).width > QUOTE_WIDTH) {
+      lastLine = Array.from(lastLine).slice(0, -1).join("");
+    }
+    lines[maxLines - 1] = `${lastLine}…`;
+  }
 
   context.fillStyle = "#ffffff";
-  context.textAlign = "left";
   context.textBaseline = "middle";
   const textHeight = lines.length * lineHeight;
   const textTop = QUOTE_TOP + (QUOTE_HEIGHT - textHeight) / 2;
   let y = textTop + lineHeight / 2;
   for (const line of lines) {
-    context.fillText(line, QUOTE_X, y);
+    context.fillText(line, QUOTE_X, y, QUOTE_WIDTH);
     y += lineHeight;
   }
 
-  const authorY = Math.min(QUOTE_TOP + QUOTE_HEIGHT + 38, textTop + textHeight + 46);
+  const authorY = Math.max(720, textTop + textHeight + 44);
   context.textBaseline = "alphabetic";
-  context.font = `26px ${FONT_FAMILY}`;
-  context.fillStyle = "#bdbdbd";
-  context.fillText(`- ${displayName}`.slice(0, 64), QUOTE_X, authorY, QUOTE_WIDTH);
-  context.font = `18px ${FONT_FAMILY}`;
+  context.font = `bold 30px ${FONT_FAMILY}`;
+  context.fillStyle = "#777777";
+  context.fillText("-", QUOTE_X, authorY);
+  context.fillStyle = "#ffffff";
+  context.fillText(displayName.slice(0, 64), QUOTE_X + 22, authorY, QUOTE_WIDTH - 22);
+  context.font = `21px ${FONT_FAMILY}`;
   context.fillStyle = "#777777";
   context.fillText(`@${username}`.slice(0, 72), QUOTE_X, authorY + 36, QUOTE_WIDTH);
 
   context.textAlign = "right";
-  context.font = `16px ${FONT_FAMILY}`;
+  context.font = `17px ${FONT_FAMILY}`;
   context.fillStyle = "#666666";
-  context.fillText("Hangouts | discord.gg/hangouts", WIDTH - 90, HEIGHT - 28, WIDTH - 180);
+  context.fillText("Hangouts | discord.gg/hangouts", WIDTH - 72, HEIGHT - 34, 600);
 
   return canvas.encode("png");
 }
