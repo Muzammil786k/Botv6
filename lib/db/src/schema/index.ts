@@ -22,6 +22,8 @@ export * from "./bot-active-chat-reward-settings";
 export * from "./bot-mining";
 export * from "./bot-social-roles";
 export * from "./bot-moderation-roles";
+export * from "./bot-moderation-action-limits";
+export * from "./bot-vote-rewards";
 export * from "./bot-game-settings";
 export * from "./bot-jtc-temp-channels";
 export * from "./bot-quote-settings";

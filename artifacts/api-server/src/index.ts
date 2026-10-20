@@ -1,4 +1,4 @@
-import app from "./app";
+import app, { setApiBotClient } from "./app";
 import { logger } from "./lib/logger";
 import { createBot } from "./bot";
 
@@ -25,4 +25,4 @@ app.listen(port, () => {
   logger.info({ port }, "Server listening");
 });
 
-createBot();
+setApiBotClient(createBot());

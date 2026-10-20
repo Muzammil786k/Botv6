@@ -11,6 +11,7 @@ import {
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { premiumEmbed, premiumMessagePayload } from "./presentation";
+import { releaseModerationAction, reserveModerationAction } from "./moderationLimits";
 
 const C = 0x2b2d31;
 const DATA_DIR = join(process.cwd(), "data");
@@ -142,13 +143,13 @@ async function applyAutomodAction(message: Message, reason: string): Promise<voi
 
 export async function handleKick(message: Message): Promise<void> {
   if (!message.guild) return;
-  const mod = message.guild.members.cache.get(message.author.id);
+  const mod = message.member ?? await message.guild.members.fetch(message.author.id).catch(() => null);
   if (!mod?.permissions.has(PermissionFlagsBits.KickMembers)) {
     await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription("❌ You need **Kick Members** permission.")] });
     return;
   }
   const args = message.content.trim().split(/\s+/).slice(1);
-  const target = message.mentions.members?.first() ?? (args[0] ? message.guild.members.cache.get(args[0]) : null);
+  const target = message.mentions.members?.first() ?? (args[0] ? await message.guild.members.fetch(args[0]).catch(() => null) : null);
   if (!target) {
     await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription("❌ Usage: `!kick @user [reason]`")] });
     return;
@@ -162,22 +163,29 @@ export async function handleKick(message: Message): Promise<void> {
     return;
   }
   const reason = args.slice(1).join(" ") || "No reason provided";
+  const quota = await reserveModerationAction(message.guild.id, message.author.id, "kick");
+  if (!quota.allowed) {
+    await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription(`❌ Your kick limit has been reached (${quota.limit}). Ask a server admin to reset or raise it.`)] });
+    return;
+  }
   try {
     await target.send(premiumMessagePayload({
       embeds: [new EmbedBuilder().setColor(C).setTitle(`🥾 You were kicked from ${message.guild.name}`).addFields({ name: "Reason", value: reason })],
     }, message.client?.user ?? null)).catch(() => {});
     await target.kick(reason);
-    await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription(`✅ **${target.user.username}** has been kicked.\n**Reason:** ${reason}`)] });
   } catch {
+    if (quota.reserved) await releaseModerationAction(message.guild.id, message.author.id, "kick").catch(() => {});
     await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription("❌ Failed to kick that member.")] });
+    return;
   }
+  await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription(`✅ **${target.user.username}** has been kicked.\n**Reason:** ${reason}`)] });
 }
 
 // ─── Ban ───────────────────────────────────────────────────────────────────────
 
 export async function handleBan(message: Message): Promise<void> {
   if (!message.guild) return;
-  const mod = message.guild.members.cache.get(message.author.id);
+  const mod = message.member ?? await message.guild.members.fetch(message.author.id).catch(() => null);
   if (!mod?.permissions.has(PermissionFlagsBits.BanMembers)) {
     await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription("❌ You need **Ban Members** permission.")] });
     return;
@@ -202,26 +210,35 @@ export async function handleBan(message: Message): Promise<void> {
     await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription("❌ I cannot ban that member.")] });
     return;
   }
+  if (!target) {
+    const existingBan = await message.guild.bans.fetch(targetId).catch(() => null);
+    if (existingBan) {
+      await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription(`ℹ️ User \`${targetId}\` is already banned.`)] });
+      return;
+    }
+  }
+  const quota = await reserveModerationAction(message.guild.id, message.author.id, "ban");
+  if (!quota.allowed) {
+    await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription(`❌ Your ban limit has been reached (${quota.limit}). Ask a server admin to reset or raise it.`)] });
+    return;
+  }
   try {
     if (target) {
       await target.send(premiumMessagePayload({
         embeds: [new EmbedBuilder().setColor(C).setTitle(`🔨 You were banned from ${message.guild.name}`).addFields({ name: "Reason", value: reason })],
       }, message.client?.user ?? null)).catch(() => {});
       await target.ban({ reason, deleteMessageSeconds: 7 * 24 * 60 * 60 });
-      await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription(`✅ **${target.user.username}** has been banned.\n**Reason:** ${reason}`)] });
-      return;
+    } else {
+      await message.guild.bans.create(targetId, { reason, deleteMessageSeconds: 7 * 24 * 60 * 60 });
     }
-
-    const existingBan = await message.guild.bans.fetch(targetId).catch(() => null);
-    if (existingBan) {
-      await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription(`ℹ️ User \`${targetId}\` is already banned.`)] });
-      return;
-    }
-    await message.guild.bans.create(targetId, { reason, deleteMessageSeconds: 7 * 24 * 60 * 60 });
-    await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription(`✅ User ID \`${targetId}\` has been banned.\n**Reason:** ${reason}`)] });
   } catch {
+    if (quota.reserved) await releaseModerationAction(message.guild.id, message.author.id, "ban").catch(() => {});
     await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription("❌ Failed to ban that member.")] });
+    return;
   }
+  await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription(target
+    ? `✅ **${target.user.username}** has been banned.\n**Reason:** ${reason}`
+    : `✅ User ID \`${targetId}\` has been banned.\n**Reason:** ${reason}`)] });
 }
 
 // ─── Unban ─────────────────────────────────────────────────────────────────────

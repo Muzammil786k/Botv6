@@ -187,6 +187,11 @@ const slashCommands = [
     .addChannelOption((o) => o.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
     .addStringOption((o) => o.setName("message").setDescription("Announcement text").setRequired(true)),
   new SlashCommandBuilder()
+    .setName("send")
+    .setDescription("Send an announcement embed.")
+    .addChannelOption((o) => o.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
+    .addStringOption((o) => o.setName("message").setDescription("Announcement text").setRequired(true)),
+  new SlashCommandBuilder()
     .setName("autoreact")
     .setDescription("Configure automatic emoji reactions in a channel.")
     .addSubcommand((sub) =>
@@ -415,7 +420,8 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
     }
     case "nick":
       return `!nick ${mentionContent(interaction, "user")} ${string("nickname")}`.trim();
-    case "announce": {
+    case "announce":
+    case "send": {
       const channel = interaction.options.getChannel("channel");
       return `!announce ${channel ? `<#${channel.id}>` : ""} ${string("message")}`.trim();
     }
@@ -435,10 +441,12 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
   }
 }
 
-function createMessageAdapter(interaction: ChatInputCommandInteraction, content: string): Message {
-  const member = interaction.member instanceof GuildMember ? interaction.member : null;
+async function createMessageAdapter(interaction: ChatInputCommandInteraction, content: string): Promise<Message> {
+  const guild = interaction.guild!;
   const user = interaction.user;
-  const selectedUserIds = new Set<string>();
+  const member = guild.members.cache.get(user.id) ?? (interaction.member instanceof GuildMember
+    ? interaction.member
+    : await guild.members.fetch(user.id).catch(() => null));
   const selectedUsers = new Collection<string, User>();
   const selectedMembers = new Collection<string, GuildMember>();
   const selectedRoles = new Collection<string, Role>();
@@ -446,15 +454,16 @@ function createMessageAdapter(interaction: ChatInputCommandInteraction, content:
   for (const option of ["user", "user1", "user2"]) {
     const selected = interaction.options.getUser(option);
     if (selected) {
-      selectedUserIds.add(selected.id);
       selectedUsers.set(selected.id, selected);
-      const selectedMember = interaction.guild?.members.cache.get(selected.id);
+      const selectedMember = guild.members.cache.get(selected.id) ?? await guild.members.fetch(selected.id).catch(() => null);
       if (selectedMember) selectedMembers.set(selected.id, selectedMember);
     }
   }
 
   const selectedRole = interaction.options.getRole("role");
-  const role = selectedRole ? interaction.guild?.roles.cache.get(selectedRole.id) : undefined;
+  const role = selectedRole
+    ? guild.roles.cache.get(selectedRole.id) ?? await guild.roles.fetch(selectedRole.id).catch(() => null)
+    : undefined;
   if (role) selectedRoles.set(role.id, role);
 
   const channel = interaction.channel;
@@ -472,7 +481,8 @@ function createMessageAdapter(interaction: ChatInputCommandInteraction, content:
     id: interaction.id,
     content,
     author: user,
-    guild: interaction.guild,
+    client: interaction.client,
+    guild,
     channel,
     member,
     mentions,
@@ -523,16 +533,10 @@ export async function handleSlashCommand(client: Client, interaction: ChatInputC
       return;
     }
 
-    if (
-      Object.hasOwn(SOCIAL_ACTIONS, interaction.commandName) ||
-      interaction.commandName === "ship" ||
-      interaction.commandName === "airdrop"
-    ) {
-      await interaction.deferReply();
-    }
+    await interaction.deferReply();
 
     const content = buildLegacyContent(interaction);
-    const message = createMessageAdapter(interaction, content);
+    const message = await createMessageAdapter(interaction, content);
     await handleMessage(client, message, { skipAutoModeration: true });
     await bumpStickyForChannel(client, interaction.guild.id, interaction.channelId);
   } catch (err) {

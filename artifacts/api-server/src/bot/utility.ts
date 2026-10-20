@@ -379,7 +379,7 @@ export async function handleQuote(message: Message): Promise<void> {
 
 export async function handleRole(message: Message): Promise<void> {
   if (!message.guild) return;
-  const mod = message.guild.members.cache.get(message.author.id);
+  const mod = message.member ?? await message.guild.members.fetch(message.author.id).catch(() => null);
   if (!mod?.permissions.has(PermissionFlagsBits.ManageRoles)) {
     await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription("❌ You need **Manage Roles** permission.")] });
     return;
@@ -426,7 +426,7 @@ export async function handleRole(message: Message): Promise<void> {
 
 export async function handleNick(message: Message): Promise<void> {
   if (!message.guild) return;
-  const mod = message.guild.members.cache.get(message.author.id);
+  const mod = message.member ?? await message.guild.members.fetch(message.author.id).catch(() => null);
   if (!mod?.permissions.has(PermissionFlagsBits.ManageNicknames)) {
     await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription("❌ You need **Manage Nicknames** permission.")] });
     return;
@@ -465,7 +465,7 @@ export async function handleNick(message: Message): Promise<void> {
 
 export async function handleAnnounce(message: Message): Promise<void> {
   if (!message.guild) return;
-  const mod = message.guild.members.cache.get(message.author.id);
+  const mod = message.member ?? await message.guild.members.fetch(message.author.id).catch(() => null);
   if (!mod?.permissions.has(PermissionFlagsBits.ManageGuild)) {
     await message.reply({ embeds: [new EmbedBuilder().setColor(C).setDescription("❌ You need **Manage Server** permission.")] });
     return;
