@@ -16,16 +16,16 @@ import {
 import { logger } from "../lib/logger";
 
 const DEFAULT_INTERVAL_MINUTES = 30;
-const MIN_INTERVAL_MINUTES = 30;
+const MIN_INTERVAL_MINUTES = 0;
 const MAX_INTERVAL_MINUTES = 24 * 60;
 const CRATE_LIFETIME_MS = 10 * 60_000;
 const SCHEDULER_INTERVAL_MS = 30_000;
 const DROP_REACTIONS = ["🌦️", "🎁", "🍀", "💎", "⭐", "🪙", "🎈", "🍉"] as const;
 const LEGACY_REACTION = "🌦️";
 const CREDIT_DROP_TIERS = [
-  { name: "Common", icon: "<:common:1558505660470010070>", min: 50, max: 100, weight: 70, color: 0x95a5a6 },
-  { name: "Rare", icon: "🔷", min: 100, max: 200, weight: 25, color: 0x3498db },
-  { name: "Mythic", icon: "🌌", min: 200, max: 300, weight: 5, color: 0xf1c40f },
+  { name: "Common", icon: "<:common:1558505660470010070>", min: 100, max: 200, weight: 70, color: 0x95a5a6 },
+  { name: "Rare", icon: "<:rare:1562815035091329034>", min: 200, max: 500, weight: 25, color: 0x3498db },
+  { name: "Epic", icon: "🌌", min: 500, max: 1000, weight: 5, color: 0xf1c40f },
 ] as const;
 
 let scheduler: NodeJS.Timeout | undefined;
@@ -35,6 +35,7 @@ function creditDropEmbed(
   expiresAt: number,
   reaction: string,
   tier: (typeof CREDIT_DROP_TIERS)[number],
+  creditReward: number,
 ): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(tier.color)
@@ -44,7 +45,7 @@ function creditDropEmbed(
       `<:reaction:1558393068254666785>  **Reaction:** ${reaction}\n` +
       "<:trophy:1558393071224365102>  **First valid reaction wins!**\n\n" +
       `${tier.icon} **Rarity:** ${tier.name}\n` +
-      `<:reward:1558393075829702726> **Reward:** ${tier.min}–${tier.max} Credits\n` +
+      `<:reward:1558393075829702726> **Reward:** ${creditReward} Credits\n` +
       `<:time:1558393079851917372> **Expires:** <t:${Math.floor(expiresAt / 1000)}:R>`,
     );
 }
@@ -62,12 +63,16 @@ function parseInterval(value: string | undefined): number | null {
     : null;
 }
 
-async function getCreditDropSettings(guildId: string) {
-  const [settings] = await db
+async function getCreditDropSettings(guildId: string, channelId?: string) {
+  return db
     .select()
     .from(botCrateSettingsTable)
-    .where(eq(botCrateSettingsTable.guildId, guildId));
-  return settings;
+    .where(channelId
+      ? and(
+          eq(botCrateSettingsTable.guildId, guildId),
+          eq(botCrateSettingsTable.channelId, channelId),
+        )
+      : eq(botCrateSettingsTable.guildId, guildId));
 }
 
 export async function handleCreditDropCommand(message: Message): Promise<void> {
@@ -85,11 +90,22 @@ export async function handleCreditDropCommand(message: Message): Promise<void> {
   try {
     if (normalizedAction === "status") {
       const settings = await getCreditDropSettings(guild.id);
-      await message.reply(
-        settings
-          ? `**Credit drop settings**\nChannel: <#${settings.channelId}>\nInterval: ${settings.intervalMinutes} minutes\nStatus: ${settings.enabled ? "enabled" : "paused"}\nNext drop: ${settings.enabled ? `<t:${Math.floor(settings.nextCrateAt / 1000)}:R>` : "paused"}\nActive drop: ${settings.activeMessageId ? `<#${settings.channelId}> (expires <t:${Math.floor((settings.activeExpiresAt ?? 0) / 1000)}:R>)` : "none"}\nTotal claimed: ${settings.totalCreditDropsClaimed.toLocaleString()}`
-          : "Credit drops are not configured. Use `!creditdrop setup #channel`.",
+      if (settings.length === 0) {
+        await message.reply("Credit drops are not configured. Use `!creditdrop setup #channel`.");
+        return;
+      }
+      const statusLines = settings.map((setting) =>
+        `Channel: <#${setting.channelId}>\nInterval: ${setting.intervalMinutes} minutes\nStatus: ${setting.enabled ? "enabled" : "paused"}\nNext drop: ${setting.enabled ? `<t:${Math.floor(setting.nextCrateAt / 1000)}:R>` : "paused"}\nActive drop: ${setting.activeMessageId ? `expires <t:${Math.floor((setting.activeExpiresAt ?? 0) / 1000)}:R>` : "none"}\nTotal claimed: ${setting.totalCreditDropsClaimed.toLocaleString()}`
       );
+      let statusMessage = "**Credit drop settings**";
+      for (const statusLine of statusLines) {
+        if (statusMessage.length + statusLine.length + 2 > 1800) {
+          await message.reply(statusMessage);
+          statusMessage = "**Credit drop settings (continued)**";
+        }
+        statusMessage += `\n\n${statusLine}`;
+      }
+      await message.reply(statusMessage);
       return;
     }
 
@@ -104,11 +120,11 @@ export async function handleCreditDropCommand(message: Message): Promise<void> {
       const intervalMinutes = intervalArgument
         ? parseInterval(intervalArgument)
         : DEFAULT_INTERVAL_MINUTES;
-      if (!intervalMinutes) {
+      if (intervalMinutes === null) {
         await message.reply(`❌ Interval must be ${MIN_INTERVAL_MINUTES}m–24h, for example \`30m\` or \`2h\`.`);
         return;
       }
-      const existing = await getCreditDropSettings(guild.id);
+      const [existing] = await getCreditDropSettings(guild.id, channel.id);
       const now = Date.now();
       if (existing?.activeMessageId) {
         const previousChannel = await guild.channels.fetch(existing.channelId).catch(() => null);
@@ -131,7 +147,7 @@ export async function handleCreditDropCommand(message: Message): Promise<void> {
           nextCrateAt: now + intervalMinutes * 60_000,
         })
         .onConflictDoUpdate({
-          target: botCrateSettingsTable.guildId,
+          target: [botCrateSettingsTable.guildId, botCrateSettingsTable.channelId],
           set: {
             channelId: channel.id,
             intervalMinutes,
@@ -151,50 +167,104 @@ export async function handleCreditDropCommand(message: Message): Promise<void> {
       return;
     }
 
-    if (normalizedAction === "interval") {
-      const intervalMinutes = parseInterval(args[0]);
-      if (!intervalMinutes) {
-        await message.reply(`Usage: \`!creditdrop interval 30m\` (allowed: ${MIN_INTERVAL_MINUTES}m–24h).`);
+    if (normalizedAction === "remove") {
+      const channel = message.mentions.channels.first();
+      if (!channel || channel.type !== ChannelType.GuildText) {
+        await message.reply("Usage: `!creditdrop remove #channel`.");
         return;
       }
-      const settings = await getCreditDropSettings(guild.id);
+      const [settings] = await getCreditDropSettings(guild.id, channel.id);
       if (!settings) {
+        await message.reply(`❌ Credit drops are not configured in ${channel}.`);
+        return;
+      }
+      if (settings.activeMessageId) {
+        const activeChannel = await guild.channels.fetch(settings.channelId).catch(() => null);
+        const activeDrop = activeChannel?.isTextBased()
+          ? await activeChannel.messages.fetch(settings.activeMessageId).catch(() => null)
+          : null;
+        if (activeDrop?.author.id === message.client.user?.id) {
+          await activeDrop.delete().catch((error: unknown) => {
+            logger.warn({ err: error, guildId: guild.id, messageId: settings.activeMessageId }, "Could not remove the active credit drop");
+          });
+        }
+      }
+      await db.delete(botCrateSettingsTable).where(and(
+        eq(botCrateSettingsTable.guildId, guild.id),
+        eq(botCrateSettingsTable.channelId, channel.id),
+      ));
+      await message.reply(`✅ Credit drops removed from ${channel}.`);
+      return;
+    }
+
+    if (normalizedAction === "interval") {
+      const intervalArgument = args.find((argument) => parseInterval(argument) !== null);
+      const intervalMinutes = parseInterval(intervalArgument);
+      if (intervalMinutes === null) {
+        await message.reply(`Usage: \`!creditdrop interval 1h [#channel]\` (allowed: ${MIN_INTERVAL_MINUTES}m–24h).`);
+        return;
+      }
+      const channel = message.mentions.channels.first();
+      if (channel && channel.type !== ChannelType.GuildText) {
+        await message.reply("❌ Choose a server text channel.");
+        return;
+      }
+      const settings = await getCreditDropSettings(guild.id, channel?.id);
+      if (settings.length === 0) {
         await message.reply("❌ Configure a channel first with `!creditdrop setup #channel`.");
         return;
       }
       const now = Date.now();
-      await db.update(botCrateSettingsTable)
-        .set({
-          intervalMinutes,
-          nextCrateAt: now + intervalMinutes * 60_000,
-          updatedAt: new Date(now),
-        })
-        .where(eq(botCrateSettingsTable.guildId, guild.id));
-      await message.reply(`✅ Credit drop interval set to ${intervalMinutes} minutes.`);
+      for (const setting of settings) {
+        await db.update(botCrateSettingsTable)
+          .set({
+            intervalMinutes,
+            nextCrateAt: now + intervalMinutes * 60_000,
+            updatedAt: new Date(now),
+          })
+          .where(and(
+            eq(botCrateSettingsTable.guildId, guild.id),
+            eq(botCrateSettingsTable.channelId, setting.channelId),
+          ));
+      }
+      await message.reply(channel
+        ? `✅ Credit drop interval for ${channel} set to ${intervalMinutes} minutes.`
+        : `✅ Credit drop interval set to ${intervalMinutes} minutes for all configured channels.`);
       return;
     }
 
     if (normalizedAction === "pause" || normalizedAction === "resume") {
       const enabled = normalizedAction === "resume";
-      const settings = await getCreditDropSettings(guild.id);
-      if (!settings) {
+      const channel = message.mentions.channels.first();
+      if (channel && channel.type !== ChannelType.GuildText) {
+        await message.reply("❌ Choose a server text channel.");
+        return;
+      }
+      const settings = await getCreditDropSettings(guild.id, channel?.id);
+      if (settings.length === 0) {
         await message.reply("❌ Configure a channel first with `!creditdrop setup #channel`.");
         return;
       }
-      await db.update(botCrateSettingsTable)
-        .set({
-          enabled,
-          nextCrateAt: enabled
-            ? Date.now() + settings.intervalMinutes * 60_000
-            : settings.nextCrateAt,
-          updatedAt: new Date(),
-        })
-        .where(eq(botCrateSettingsTable.guildId, guild.id));
-      await message.reply(`✅ Credit drops ${enabled ? "resumed" : "paused"}.`);
+      const now = Date.now();
+      for (const setting of settings) {
+        await db.update(botCrateSettingsTable)
+          .set({
+            enabled,
+            ...(enabled ? { nextCrateAt: now + setting.intervalMinutes * 60_000 } : {}),
+            updatedAt: new Date(now),
+          })
+          .where(and(
+            eq(botCrateSettingsTable.guildId, guild.id),
+            eq(botCrateSettingsTable.channelId, setting.channelId),
+          ));
+      }
+      await message.reply(channel
+        ? `✅ Credit drops ${enabled ? "resumed" : "paused"} in ${channel}.`
+        : `✅ Credit drops ${enabled ? "resumed" : "paused"} in all configured channels.`);
       return;
     }
 
-    await message.reply("Usage: `!creditdrop setup #channel [30m]`, `!creditdrop interval 30m`, `!creditdrop status`, `!creditdrop pause`, or `!creditdrop resume`.");
+    await message.reply("Usage: `!creditdrop setup #channel [30m]`, `!creditdrop remove #channel`, `!creditdrop interval 1h [#channel]`, `!creditdrop status`, `!creditdrop pause [#channel]`, or `!creditdrop resume [#channel]`.");
   } catch (error) {
     logger.error({ err: error, guildId: guild.id, action: normalizedAction }, "Credit drop settings command failed");
     await message.reply("❌ Could not update credit drop settings. Please try again.");
@@ -217,7 +287,7 @@ async function spawnCreditDrop(
   }) ?? CREDIT_DROP_TIERS[0];
   const creditReward = Math.floor(Math.random() * (tier.max - tier.min + 1)) + tier.min;
   const reaction = DROP_REACTIONS[Math.floor(Math.random() * DROP_REACTIONS.length)]!;
-  const message = await channel.send({ embeds: [creditDropEmbed(expiresAt, reaction, tier)] });
+  const message = await channel.send({ embeds: [creditDropEmbed(expiresAt, reaction, tier, creditReward)] });
   try {
     await message.react(reaction);
     await db.update(botCrateSettingsTable)
@@ -229,7 +299,10 @@ async function spawnCreditDrop(
         activeExpiresAt: expiresAt,
         updatedAt: new Date(),
       })
-      .where(eq(botCrateSettingsTable.guildId, settings.guildId));
+      .where(and(
+        eq(botCrateSettingsTable.guildId, settings.guildId),
+        eq(botCrateSettingsTable.channelId, settings.channelId),
+      ));
   } catch (error) {
     await message.delete().catch(() => {});
     throw error;
@@ -258,6 +331,7 @@ async function runScheduler(client: Client): Promise<void> {
           })
           .where(and(
             eq(botCrateSettingsTable.guildId, settings.guildId),
+            eq(botCrateSettingsTable.channelId, settings.channelId),
             eq(botCrateSettingsTable.activeMessageId, settings.activeMessageId),
           ));
       }
@@ -268,11 +342,12 @@ async function runScheduler(client: Client): Promise<void> {
         .set({ nextCrateAt, updatedAt: new Date(now) })
         .where(and(
           eq(botCrateSettingsTable.guildId, settings.guildId),
+          eq(botCrateSettingsTable.channelId, settings.channelId),
           eq(botCrateSettingsTable.enabled, true),
           eq(botCrateSettingsTable.nextCrateAt, settings.nextCrateAt),
           isNull(botCrateSettingsTable.activeMessageId),
         ))
-        .returning({ guildId: botCrateSettingsTable.guildId });
+        .returning({ guildId: botCrateSettingsTable.guildId, channelId: botCrateSettingsTable.channelId });
       if (!claimed) continue;
 
       try {
@@ -363,7 +438,10 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
         totalCreditDropsClaimed,
         updatedAt: new Date(now),
       })
-      .where(eq(botCrateSettingsTable.guildId, settings.guildId));
+      .where(and(
+        eq(botCrateSettingsTable.guildId, settings.guildId),
+        eq(botCrateSettingsTable.channelId, settings.channelId),
+      ));
     return { credits, balance, totalCreditDropsClaimed, tier };
   });
 
@@ -379,6 +457,7 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
             `<a:gift:1558505667038289990> Total Crates Claimed: \`${result.totalCreditDropsClaimed.toLocaleString()}\`\n` +
             "Use `!credits` to view your credits",
           )
+          .setFooter({ text: "This reward is given randomly to an active chatter" })
           .setTimestamp(new Date(now)),
       ],
       allowedMentions: { users: [user.id] },

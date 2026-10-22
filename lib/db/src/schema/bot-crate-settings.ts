@@ -1,7 +1,7 @@
-import { bigint, boolean, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { bigint, boolean, integer, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
 export const botCrateSettingsTable = pgTable("bot_crate_settings", {
-  guildId: text("guild_id").primaryKey(),
+  guildId: text("guild_id").notNull(),
   channelId: text("channel_id").notNull(),
   intervalMinutes: integer("interval_minutes").notNull().default(30),
   enabled: boolean("enabled").notNull().default(true),
@@ -13,4 +13,4 @@ export const botCrateSettingsTable = pgTable("bot_crate_settings", {
   activeExpiresAt: bigint("active_expires_at", { mode: "number" }),
   totalCreditDropsClaimed: integer("total_crates_claimed").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [primaryKey({ columns: [table.guildId, table.channelId] })]);

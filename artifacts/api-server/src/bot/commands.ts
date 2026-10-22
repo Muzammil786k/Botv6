@@ -45,7 +45,6 @@ import { handleTicketCommand } from "./tickets";
 import { handleSocialRoleCommand } from "./socialRole";
 import { handleModerationRoleCommand } from "./moderationRole";
 import { handleModerationLimitCommand } from "./moderationLimits";
-import { handleTopggVoteRewardCommand } from "./topggVoteCommands";
 import { handleSetGameCommand } from "./gameChannel";
 import { handleTruthOrDare } from "./truthordare";
 import { handleQuoteRoleCommand, handleSetQuoteCommand } from "./quoteChannel";
@@ -88,10 +87,6 @@ export async function handleMessage(
 
   if (lower === "!creditdrop" || lower.startsWith("!creditdrop ")) {
     await handleCreditDropCommand(message);
-    return;
-  }
-  if (lower === "!votereward" || lower.startsWith("!votereward ")) {
-    await handleTopggVoteRewardCommand(message, content.split(/\s+/).slice(1));
     return;
   }
   if (lower === "!setchatreward" || lower.startsWith("!setchatreward ")) {
