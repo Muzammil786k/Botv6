@@ -436,7 +436,7 @@ async function handleMemberMessageCommand(
     await message.reply({
       content:
         `ℹ️ Usage: \`!${kind} set #channel <message>\` or \`!${kind} remove\`.\n` +
-        "Placeholders: `{user}`, `{server}`, and `{memberCount}`.",
+        "Placeholders: `{user}`, `{user_tag}`, `{server}`, and `{memberCount}`.",
       allowedMentions: { parse: [], repliedUser: false },
     });
     return;
@@ -466,7 +466,7 @@ async function handleMemberMessageCommand(
     await message.reply({
       content:
         `✅ ${kind === "welcome" ? "Welcome" : "Goodbye"} message set in ${channel}.\n` +
-        `Placeholders {user}, {server}, and {memberCount} will be filled in automatically.${embedName ? ` Embed \`${embedName}\` will also be included.` : ""}`,
+        `Placeholders {user}, {user_tag}, {server}, and {memberCount} will be filled in automatically.${embedName ? ` Embed \`${embedName}\` will also be included.` : ""}`,
       allowedMentions: { parse: [], repliedUser: false },
     });
   } catch (error) {
