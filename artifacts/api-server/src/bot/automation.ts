@@ -483,13 +483,9 @@ export async function sendMemberMessage(
       template.replace(/\{\{?embed:[a-z0-9_-]{1,32}\}\}?/gi, "").trim(),
       member,
     );
-    const embed = new EmbedBuilder()
-      .setTitle(custom.title
-        ? render(custom.title, 256)
-        : kind === "boost"
-          ? `Thanks for boosting ${member.guild.name}`
-          : `Welcome to ${member.guild.name}`)
-      .setThumbnail(custom.thumbnailUrl ?? member.user.displayAvatarURL({ size: 256 }));
+    const embed = new EmbedBuilder();
+    if (custom.title) embed.setTitle(render(custom.title, 256));
+    if (custom.thumbnailUrl) embed.setThumbnail(custom.thumbnailUrl);
     if (custom.description) embed.setDescription(render(custom.description, 4096));
     if (custom.color) embed.setColor(Number.parseInt(custom.color.slice(1), 16));
     if (custom.imageUrl) embed.setImage(custom.imageUrl);
@@ -509,24 +505,8 @@ export async function sendMemberMessage(
     return;
   }
 
-  const title =
-    kind === "welcome"
-      ? `Welcome to ${member.guild.name}`
-      : kind === "boost"
-        ? settings.boostTitle ?? `Thanks for boosting ${member.guild.name}`
-        : `Goodbye from ${member.guild.name}`;
   await channel.send({
-    embeds: [
-      premiumEmbed(
-        renderMemberTemplate(template, member),
-        {
-          title,
-          thumbnail: member.user.displayAvatarURL({ size: 256 }),
-          color: kind === "goodbye" ? premiumColors.warning : premiumColors.success,
-        },
-        client.user,
-      ),
-    ],
+    content: renderMemberTemplate(template, member),
     allowedMentions: { parse: [], users: [member.id] },
   });
 }

@@ -39,6 +39,8 @@ import {
   handleStickyCommand,
   handleWelcomeCommand,
   handleBoostMessageCommand,
+  handleGoodbyeCommand,
+  handleSetGreetingCommand,
 } from "./automation-commands";
 import { withPremiumReplies } from "./presentation";
 import { handleJtcCommand, handleVcCommand } from "./joinToCreate";
@@ -124,6 +126,10 @@ export async function handleMessage(
     await handleStickyCommand(client, message);
   } else if (lower === "!welcome" || lower.startsWith("!welcome ")) {
     await handleWelcomeCommand(message, client);
+  } else if (lower === "!goodbye" || lower.startsWith("!goodbye ")) {
+    await handleGoodbyeCommand(message, client);
+  } else if (/^!set\s+(welcome|boost|goodbye)\s+channel\b/i.test(message.content.trim())) {
+    await handleSetGreetingCommand(message, client);
   } else if (lower === "!boost" || lower.startsWith("!boost ")) {
     await handleBoostMessageCommand(message, client);
   } else if (lower === "!reminder" || lower.startsWith("!reminder ")) {
