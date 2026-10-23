@@ -6,7 +6,7 @@ import {
   type Message,
 } from "discord.js";
 import { and, eq } from "drizzle-orm";
-import { botCustomEmbedsTable, db } from "@workspace/db";
+import { botCustomEmbedsTable, botGuildMessagesTable, db } from "@workspace/db";
 import { logger } from "../lib/logger";
 import {
   automationLimits,
@@ -20,7 +20,9 @@ import {
   setChannelAutoReact,
   setChannelAutoResponder,
   setChannelSticky,
+  sendMemberMessage,
   setGuildMessage,
+  type GuildMessageKind,
 } from "./automation";
 
 async function requireManageServer(message: Message): Promise<boolean> {
@@ -370,18 +372,49 @@ export async function handleStickyCommand(
 
 async function handleMemberMessageCommand(
   message: Message,
-  kind: "welcome" | "goodbye",
+  kind: GuildMessageKind,
+  client: Client,
 ): Promise<void> {
   if (!message.guild || !(await requireManageServer(message))) return;
 
+  const label = kind === "welcome" ? "Welcome" : kind === "boost" ? "Boost" : "Goodbye";
   const args = message.content.trim().split(/\s+/);
   const action = args[1]?.toLowerCase();
-  if (kind === "welcome" && action === "embed") {
+  if (action === "test" && kind !== "goodbye") {
+    const member = message.member ?? await message.guild.members.fetch(message.author.id).catch(() => null);
+    if (!member) return;
+    const [configured] = await db
+      .select()
+      .from(botGuildMessagesTable)
+      .where(eq(botGuildMessagesTable.guildId, message.guild.id))
+      .limit(1);
+    const f = kind === "welcome"
+      ? configured?.welcomeChannelId && configured.welcomeTemplate
+      : configured?.boostChannelId && configured.boostTemplate;
+    if (!f) {
+      await message.reply({
+        content: `ℹ️ No ${kind} message is set. Use \`!${kind} set #channel <message>\` or \`!${kind} embed #channel [embed-name]\` first.`,
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+    try {
+      await sendMemberMessage(client, member, kind);
+      await message.reply({
+        content: `✅ Test ${kind} message sent.`,
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+    } catch (error) {
+      await saveFailure(message, `${kind} message test`, error);
+    }
+    return;
+  }
+  if (kind !== "goodbye" && action === "embed") {
     const channel = mentionedTextChannel(message);
-    const embedName = (args[3] ?? "welcome").toLowerCase();
+    const embedName = (args[3] ?? kind).toLowerCase();
     if (!channel || !/^[a-z0-9_-]{1,32}$/.test(embedName)) {
       await message.reply({
-        content: "ℹ️ Usage: `!welcome embed #channel [embed-name]` (default embed name: `welcome`).",
+        content: "ℹ️ Usage: `!welcome embed #channel [embed-name]` (default embed name: `${kind}`).",
         allowedMentions: { parse: [], repliedUser: false },
       });
       return;
@@ -404,13 +437,13 @@ async function handleMemberMessageCommand(
     }
 
     try {
-      await setGuildMessage(message.guild.id, "welcome", channel.id, `{{embed:${embedName}}}`);
+      await setGuildMessage(message.guild.id, kind, channel.id, `{{embed:${embedName}}}`);
       await message.reply({
-        content: `✅ Welcome embed \`${embedName}\` set in ${channel}. Preview or edit it with \`!embed show ${embedName}\` and \`!embed edit ${embedName} <field> <value>\`.`,
+        content: `✅ ${label} embed \`${embedName}\` set in ${channel}. Preview or edit it with \`!embed show ${embedName}\` and \`!embed edit ${embedName} <field> <value>\`.`,
         allowedMentions: { parse: [], repliedUser: false },
       });
     } catch (error) {
-      await saveFailure(message, "welcome embed", error);
+      await saveFailure(message, `${kind} embed`, error);
     }
     return;
   }
@@ -420,7 +453,7 @@ async function handleMemberMessageCommand(
       const removed = await removeGuildMessage(message.guild.id, kind);
       await message.reply({
         content: removed
-          ? `✅ ${kind === "welcome" ? "Welcome" : "Goodbye"} messages are off.`
+          ? `✅ ${label} messages are off.`
           : `ℹ️ No ${kind} message was configured.`,
         allowedMentions: { parse: [], repliedUser: false },
       });
@@ -435,14 +468,14 @@ async function handleMemberMessageCommand(
   if (action !== "set" || !channel || !template || template.length > 1_800) {
     await message.reply({
       content:
-        `ℹ️ Usage: \`!${kind} set #channel <message>\` or \`!${kind} remove\`.\n` +
-        "Placeholders: `{user}`, `{server}`, and `{memberCount}`.",
+        `ℹ️ Usage: \`!${kind} set #channel <message>\`, \`!${kind} remove\`${kind === "goodbye" ? "" : `, \`!${kind} embed #channel [embed-name]\`, or \`!${kind} test\``}.\n` +
+        "Placeholders: `{user}`, `{user_tag}`, `{server}`, `{memberCount}`, and `{boostCount}`.",
       allowedMentions: { parse: [], repliedUser: false },
     });
     return;
   }
 
-  const embedName = kind === "welcome" ? welcomeEmbedName(template) : null;
+  const embedName = kind !== "goodbye" ? welcomeEmbedName(template) : null;
   if (embedName) {
     const [savedEmbed] = await db
       .select({ name: botCustomEmbedsTable.name })
@@ -465,8 +498,8 @@ async function handleMemberMessageCommand(
     await setGuildMessage(message.guild.id, kind, channel.id, template);
     await message.reply({
       content:
-        `✅ ${kind === "welcome" ? "Welcome" : "Goodbye"} message set in ${channel}.\n` +
-        `Placeholders {user}, {server}, and {memberCount} will be filled in automatically.${embedName ? ` Embed \`${embedName}\` will also be included.` : ""}`,
+        `✅ ${label} message set in ${channel}.\n` +
+        `Placeholders {user}, {user_tag}, {server}, {memberCount}, and {boostCount} will be filled in automatically.${embedName ? ` Embed \`${embedName}\` will also be included.` : ""}`,
       allowedMentions: { parse: [], repliedUser: false },
     });
   } catch (error) {
@@ -474,6 +507,10 @@ async function handleMemberMessageCommand(
   }
 }
 
-export function handleWelcomeCommand(message: Message): Promise<void> {
-  return handleMemberMessageCommand(message, "welcome");
+export function handleWelcomeCommand(message: Message, client: Client): Promise<void> {
+  return handleMemberMessageCommand(message, "welcome", client);
+}
+
+export function handleBoostMessageCommand(message: Message, client: Client): Promise<void> {
+  return handleMemberMessageCommand(message, "boost", client);
 }

@@ -182,7 +182,9 @@ function pageAutomation(): EmbedBuilder {
       { name: "`!sticky set #channel <message>` • `/sticky set`", value: "Keep one branded message at the bottom of a channel. It moves after new messages." },
       { name: "`!sticky status #channel`", value: "Check whether a sticky message is configured in a channel." },
       { name: "`!sticky remove #channel` • `/sticky remove`", value: "Remove the sticky message and stop reposting it." },
-      { name: "`!welcome set #channel <message>` • `/welcome set`", value: "Post a branded text welcome. Use `{user}`, `{server}`, or `{memberCount}`. Add `{embed:name}` to include a saved embed with the greeting, e.g. `!welcome set #welcome Welcome {user}! {embed:welcome}`." },
+      { name: "`!welcome test` • `!boost test`", value: "Send the configured welcome or boost message to its channel using you as the member." },
+      { name: "`!boost set #channel <message>` • `!boost embed #channel [name]`", value: "Post a message when someone boosts the server. Placeholders: `{user}`, `{user_tag}`, `{server}`, `{memberCount}`, `{boostCount}`. Link a saved embed with `{embed:name}`. Remove with `!boost remove`." },
+      { name: "`!welcome set #channel <message>` • `/welcome set`", value: "Post a branded text welcome. Use `{user}`, `{user_tag}`, `{server}`, or `{memberCount}`. Add `{embed:name}` to include a saved embed with the greeting, e.g. `!welcome set #welcome Welcome {user}! {embed:welcome}`." },
       { name: "`!welcome embed #channel [name]`", value: "Use a saved custom embed by itself when a member joins. Create/edit it with `!embed create`, `!embed edit`, and preview with `!embed show`. The default embed name is `welcome`; placeholders are supported." },
       { name: "`!welcome remove` • `/welcome remove`", value: "Turn off welcome messages." },
     )
@@ -208,7 +210,7 @@ function page5(): EmbedBuilder {
 function pageEconomy(): EmbedBuilder {
   return helpPage("💰 Economy")
     .addFields(
-      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\n`!credits add @user <amount>` / `give` / `remove` — adjust a member's balance (**Manage Server**).\nTwo chatters with 21+ messages each in 10 minutes receive different tiers: **Common 50**, **Rare 100**, or very rare **Epic 200 credits**." },
+      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\n`!top credits` — top 10 members by credits\n`!credits add @user <amount>` / `give` / `remove` — adjust a member's balance (**Manage Server**).\nTwo chatters with 21+ messages each in 10 minutes receive different tiers: **Common 50**, **Rare 100**, or very rare **Epic 200 credits**." },
       { name: "🎉 **Credit Airdrop**", value: "`!airdrop <credits> <duration>` / `/airdrop create` — start a timed drop with an Enter button. Everyone who joins splits the pot evenly; leftover credits are distributed one each. Example: `!airdrop 200 10m`. *(Manage Server)*" },
       { name: "🏷️ **Role shop**", value: "`!shop` — browse numbered role/price pages\n`!shop buy @role` or `!shop buy Role Name` — buy with credits\n`!shop role @role` — buy a listed role\n`!shop add @role <price>` — add a listing\n`!shop edit @role <new-price>` — edit its price\n`!shop remove @role` — remove a listing (**Manage Server**)" },
     )

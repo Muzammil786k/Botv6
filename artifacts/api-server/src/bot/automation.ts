@@ -214,14 +214,21 @@ export async function removeChannelSticky(
   return { removed: true, messageId: settings.stickyMessageId };
 }
 
+export type GuildMessageKind = "welcome" | "goodbye" | "boost";
+
+const guildMessageFields = {
+  welcome: { channel: "welcomeChannelId", template: "welcomeTemplate" },
+  goodbye: { channel: "goodbyeChannelId", template: "goodbyeTemplate" },
+  boost: { channel: "boostChannelId", template: "boostTemplate" },
+} as const;
+
 export async function setGuildMessage(
   guildId: string,
-  kind: "welcome" | "goodbye",
+  kind: GuildMessageKind,
   channelId: string,
   template: string,
 ): Promise<void> {
-  const channelField = kind === "welcome" ? "welcomeChannelId" : "goodbyeChannelId";
-  const templateField = kind === "welcome" ? "welcomeTemplate" : "goodbyeTemplate";
+  const { channel: channelField, template: templateField } = guildMessageFields[kind];
   await db
     .insert(botGuildMessagesTable)
     .values({
@@ -241,7 +248,7 @@ export async function setGuildMessage(
 
 export async function removeGuildMessage(
   guildId: string,
-  kind: "welcome" | "goodbye",
+  kind: GuildMessageKind,
 ): Promise<boolean> {
   const [settings] = await db
     .select()
@@ -250,37 +257,27 @@ export async function removeGuildMessage(
     .limit(1);
   if (!settings) return false;
 
-  const channelId =
-    kind === "welcome" ? settings.welcomeChannelId : settings.goodbyeChannelId;
-  const template =
-    kind === "welcome" ? settings.welcomeTemplate : settings.goodbyeTemplate;
-  if (!channelId && !template) return false;
+  const fields = guildMessageFields[kind];
+  if (!settings[fields.channel] && !settings[fields.template]) return false;
 
-  const otherChannelId =
-    kind === "welcome" ? settings.goodbyeChannelId : settings.welcomeChannelId;
-  const otherTemplate =
-    kind === "welcome" ? settings.goodbyeTemplate : settings.welcomeTemplate;
+  const stillUsed = (Object.keys(guildMessageFields) as GuildMessageKind[])
+    .filter((other) => other !== kind)
+    .some((other) =>
+      settings[guildMessageFields[other].channel] || settings[guildMessageFields[other].template]);
 
-  if (!otherChannelId && !otherTemplate) {
+  if (!stillUsed) {
     await db
       .delete(botGuildMessagesTable)
       .where(eq(botGuildMessagesTable.guildId, guildId));
   } else {
     await db
       .update(botGuildMessagesTable)
-      .set(
-        kind === "welcome"
-          ? {
-              welcomeChannelId: null,
-              welcomeTemplate: null,
-              updatedAt: new Date(),
-            }
-          : {
-              goodbyeChannelId: null,
-              goodbyeTemplate: null,
-              updatedAt: new Date(),
-            },
-      )
+      .set({
+        [fields.channel]: null,
+        [fields.template]: null,
+        ...(kind === "boost" ? { boostTitle: null } : {}),
+        updatedAt: new Date(),
+      })
       .where(eq(botGuildMessagesTable.guildId, guildId));
   }
   return true;
@@ -427,15 +424,17 @@ function renderMemberTemplate(
 ): string {
   return template
     .replaceAll("{user}", `<@${member.id}>`)
+    .replaceAll("{user_tag}", member.user?.tag ?? "Unknown")
     .replaceAll("{server}", member.guild.name)
     .replaceAll("{memberCount}", String(member.guild.memberCount))
+    .replaceAll("{boostCount}", String(member.guild.premiumSubscriptionCount ?? 0))
     .slice(0, 4096);
 }
 
 export async function sendMemberMessage(
   client: Client,
   member: GuildMember | PartialGuildMember,
-  kind: "welcome" | "goodbye",
+  kind: GuildMessageKind,
 ): Promise<void> {
   const [settings] = await db
     .select()
@@ -444,10 +443,8 @@ export async function sendMemberMessage(
     .limit(1);
   if (!settings) return;
 
-  const channelId =
-    kind === "welcome" ? settings.welcomeChannelId : settings.goodbyeChannelId;
-  const template =
-    kind === "welcome" ? settings.welcomeTemplate : settings.goodbyeTemplate;
+  const channelId = settings[guildMessageFields[kind].channel];
+  const template = settings[guildMessageFields[kind].template];
   if (!channelId || !template) return;
 
   const channel = await getTextChannel(client, member.guild.id, channelId);
@@ -459,7 +456,7 @@ export async function sendMemberMessage(
     return;
   }
 
-  const embedToken = kind === "welcome"
+  const embedToken = kind !== "goodbye"
     ? /\{\{?embed:([a-z0-9_-]{1,32})\}\}?/i.exec(template)
     : null;
   const customEmbedName = embedToken?.[1]?.toLowerCase();
@@ -487,7 +484,11 @@ export async function sendMemberMessage(
       member,
     );
     const embed = new EmbedBuilder()
-      .setTitle(custom.title ? render(custom.title, 256) : `Welcome to ${member.guild.name}`)
+      .setTitle(custom.title
+        ? render(custom.title, 256)
+        : kind === "boost"
+          ? `Thanks for boosting ${member.guild.name}`
+          : `Welcome to ${member.guild.name}`)
       .setThumbnail(custom.thumbnailUrl ?? member.user.displayAvatarURL({ size: 256 }));
     if (custom.description) embed.setDescription(render(custom.description, 4096));
     if (custom.color) embed.setColor(Number.parseInt(custom.color.slice(1), 16));
@@ -511,7 +512,9 @@ export async function sendMemberMessage(
   const title =
     kind === "welcome"
       ? `Welcome to ${member.guild.name}`
-      : `Goodbye from ${member.guild.name}`;
+      : kind === "boost"
+        ? settings.boostTitle ?? `Thanks for boosting ${member.guild.name}`
+        : `Goodbye from ${member.guild.name}`;
   await channel.send({
     embeds: [
       premiumEmbed(
@@ -519,7 +522,7 @@ export async function sendMemberMessage(
         {
           title,
           thumbnail: member.user.displayAvatarURL({ size: 256 }),
-          color: kind === "welcome" ? premiumColors.success : premiumColors.warning,
+          color: kind === "goodbye" ? premiumColors.warning : premiumColors.success,
         },
         client.user,
       ),
