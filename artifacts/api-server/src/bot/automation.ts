@@ -424,7 +424,7 @@ function renderMemberTemplate(
 ): string {
   return template
     .replaceAll("{user}", `<@${member.id}>`)
-    .replaceAll("{user_tag}", member.user?.tag ?? "Unknown")
+    .replaceAll("{user_tag}", member.displayName ?? member.user?.username ?? "Unknown")
     .replaceAll("{server}", member.guild.name)
     .replaceAll("{memberCount}", String(member.guild.memberCount))
     .replaceAll("{boostCount}", String(member.guild.premiumSubscriptionCount ?? 0))

@@ -469,7 +469,7 @@ async function handleMemberMessageCommand(
     await message.reply({
       content:
         `ℹ️ Usage: \`!${kind} set #channel <message>\`, \`!${kind} remove\`${kind === "goodbye" ? "" : `, \`!${kind} embed #channel [embed-name]\`, or \`!${kind} test\``}.\n` +
-        "Placeholders: `{user}`, `{user_tag}`, `{server}`, `{memberCount}`, and `{boostCount}`.",
+        "Placeholders: `{user}`, `{user_tag}` (nickname), `{server}`, `{memberCount}`, and `{boostCount}`.",
       allowedMentions: { parse: [], repliedUser: false },
     });
     return;
