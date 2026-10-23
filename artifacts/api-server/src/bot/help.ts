@@ -210,7 +210,7 @@ function page5(): EmbedBuilder {
 function pageEconomy(): EmbedBuilder {
   return helpPage("💰 Economy")
     .addFields(
-      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\n`!credits add @user <amount>` / `give` / `remove` — adjust a member's balance (**Manage Server**).\nTwo chatters with 21+ messages each in 10 minutes receive different tiers: **Common 50**, **Rare 100**, or very rare **Epic 200 credits**." },
+      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\n`!top credits` — top 10 members by credits\n`!credits add @user <amount>` / `give` / `remove` — adjust a member's balance (**Manage Server**).\nTwo chatters with 21+ messages each in 10 minutes receive different tiers: **Common 50**, **Rare 100**, or very rare **Epic 200 credits**." },
       { name: "🎉 **Credit Airdrop**", value: "`!airdrop <credits> <duration>` / `/airdrop create` — start a timed drop with an Enter button. Everyone who joins splits the pot evenly; leftover credits are distributed one each. Example: `!airdrop 200 10m`. *(Manage Server)*" },
       { name: "🏷️ **Role shop**", value: "`!shop` — browse numbered role/price pages\n`!shop buy @role` or `!shop buy Role Name` — buy with credits\n`!shop role @role` — buy a listed role\n`!shop add @role <price>` — add a listing\n`!shop edit @role <new-price>` — edit its price\n`!shop remove @role` — remove a listing (**Manage Server**)" },
     )

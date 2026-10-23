@@ -49,7 +49,7 @@ import { handleModerationLimitCommand } from "./moderationLimits";
 import { handleSetGameCommand } from "./gameChannel";
 import { handleTruthOrDare } from "./truthordare";
 import { handleQuoteRoleCommand, handleSetQuoteCommand } from "./quoteChannel";
-import { handleCreditCommand, handleRoleShopCommand } from "./roleShop";
+import { handleCreditCommand, handleRoleShopCommand, handleTopCreditsCommand } from "./roleShop";
 import { awardChatCredits, handleActiveChatRewardChannelCommand } from "./credits";
 import { handleCreditDropCommand } from "./crates";
 import { handleCreditAirdropCommand } from "./creditAirdrop";
@@ -223,6 +223,8 @@ export async function handleMessage(
     await handleWordbombStop(message);
   } else if (lower === "!wbtop") {
     await handleWbTop(message);
+  } else if (lower === "!top credits" || lower === "!top credit" || lower === "!topcredits") {
+    await handleTopCreditsCommand(message);
   } else if (lower === "!credit" || lower.startsWith("!credit ") || lower === "!credits" || lower.startsWith("!credits ")) {
     await handleCreditCommand(message);
   } else if (lower === "!shop" || lower.startsWith("!shop ")) {

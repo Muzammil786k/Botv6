@@ -10,7 +10,7 @@ import {
   type Message,
   type Role,
 } from "discord.js";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gt } from "drizzle-orm";
 import { db, botMiningProfilesTable, botRoleShopTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 
@@ -23,11 +23,42 @@ function replyEmbed(title: string, description: string): { embeds: EmbedBuilder[
   return { embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle(title).setDescription(description)] };
 }
 
+export async function handleTopCreditsCommand(message: Message): Promise<void> {
+  const guild = message.guild;
+  if (!guild) return;
+  try {
+    const rows = await db
+      .select({ userId: botMiningProfilesTable.userId, credits: botMiningProfilesTable.coins })
+      .from(botMiningProfilesTable)
+      .where(and(eq(botMiningProfilesTable.guildId, guild.id), gt(botMiningProfilesTable.coins, 0)))
+      .orderBy(desc(botMiningProfilesTable.coins))
+      .limit(10);
+    if (!rows.length) {
+      await message.reply({ ...replyEmbed("Top credits", "Nobody has any credits yet."), allowedMentions: { parse: [], repliedUser: false } });
+      return;
+    }
+    const medals = ["🥇", "🥈", "🥉"];
+    const lines = rows.map((row, i) =>
+      `${medals[i] ?? `**${i + 1}.**`} <@${row.userId}> — **${row.credits.toLocaleString()} credits**`);
+    await message.reply({
+      ...replyEmbed(`Top credits in ${guild.name}`, lines.join("\n")),
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+  } catch (error) {
+    logger.error({ err: error, guildId: guild.id }, "Could not load top credits");
+    await message.reply(replyEmbed("Top credits unavailable", "I couldn't load the leaderboard. Please try again."));
+  }
+}
+
 export async function handleCreditCommand(message: Message): Promise<void> {
   const guild = message.guild;
   if (!guild) return;
 
   const [, action, , amountArgument] = message.content.trim().split(/\s+/);
+  if (action?.toLowerCase() === "top" || action?.toLowerCase() === "leaderboard") {
+    await handleTopCreditsCommand(message);
+    return;
+  }
   if (action?.toLowerCase() === "give" || action?.toLowerCase() === "add" || action?.toLowerCase() === "remove") {
     const manager = message.member ?? await guild.members.fetch(message.author.id).catch(() => null);
     if (!manager?.permissions.has(PermissionFlagsBits.ManageGuild) && !manager?.permissions.has(PermissionFlagsBits.Administrator)) {
