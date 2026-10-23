@@ -182,6 +182,8 @@ function pageAutomation(): EmbedBuilder {
       { name: "`!sticky set #channel <message>` • `/sticky set`", value: "Keep one branded message at the bottom of a channel. It moves after new messages." },
       { name: "`!sticky status #channel`", value: "Check whether a sticky message is configured in a channel." },
       { name: "`!sticky remove #channel` • `/sticky remove`", value: "Remove the sticky message and stop reposting it." },
+      { name: "`!welcome test` • `!boost test`", value: "Send the configured welcome or boost message to its channel using you as the member." },
+      { name: "`!boost set #channel <message>` • `!boost embed #channel [name]`", value: "Post a message when someone boosts the server. Placeholders: `{user}`, `{user_tag}`, `{server}`, `{memberCount}`, `{boostCount}`. Link a saved embed with `{embed:name}`. Remove with `!boost remove`." },
       { name: "`!welcome set #channel <message>` • `/welcome set`", value: "Post a branded text welcome. Use `{user}`, `{user_tag}`, `{server}`, or `{memberCount}`. Add `{embed:name}` to include a saved embed with the greeting, e.g. `!welcome set #welcome Welcome {user}! {embed:welcome}`." },
       { name: "`!welcome embed #channel [name]`", value: "Use a saved custom embed by itself when a member joins. Create/edit it with `!embed create`, `!embed edit`, and preview with `!embed show`. The default embed name is `welcome`; placeholders are supported." },
       { name: "`!welcome remove` • `/welcome remove`", value: "Turn off welcome messages." },

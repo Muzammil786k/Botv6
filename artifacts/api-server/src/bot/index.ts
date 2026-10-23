@@ -92,6 +92,13 @@ export function createBot(): Client {
     });
   });
 
+  client.on("guildMemberUpdate", (oldMember, newMember) => {
+    if (oldMember.partial || oldMember.premiumSince || !newMember.premiumSince) return;
+    void sendMemberMessage(client, newMember, "boost").catch((err) => {
+      logger.error({ err, guildId: newMember.guild.id }, "Could not send boost message");
+    });
+  });
+
   client.on("guildBanAdd", (ban) => {
     void handleEmergencyBanAdd(client, ban).catch((err) => {
       logger.error({ err, guildId: ban.guild.id, userId: ban.user.id }, "Error checking emergency ban threshold");

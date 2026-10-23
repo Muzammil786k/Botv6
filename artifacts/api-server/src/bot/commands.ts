@@ -38,6 +38,7 @@ import {
   handleAutoReactCommand,
   handleStickyCommand,
   handleWelcomeCommand,
+  handleBoostMessageCommand,
 } from "./automation-commands";
 import { withPremiumReplies } from "./presentation";
 import { handleJtcCommand, handleVcCommand } from "./joinToCreate";
@@ -122,7 +123,9 @@ export async function handleMessage(
   } else if (lower === "!sticky" || lower.startsWith("!sticky ")) {
     await handleStickyCommand(client, message);
   } else if (lower === "!welcome" || lower.startsWith("!welcome ")) {
-    await handleWelcomeCommand(message);
+    await handleWelcomeCommand(message, client);
+  } else if (lower === "!boost" || lower.startsWith("!boost ")) {
+    await handleBoostMessageCommand(message, client);
   } else if (lower === "!reminder" || lower.startsWith("!reminder ")) {
     await handleReminderCommand(message);
   } else if (lower === "!timer" || lower.startsWith("!timer ")) {
