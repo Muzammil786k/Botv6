@@ -48,12 +48,16 @@ function mentionedTextChannel(message: Message): GuildBasedChannel | null {
   return channel;
 }
 
-function textAfterChannelMention(message: Message, channel: GuildBasedChannel): string {
+function textAfterChannelMention(
+  message: Message,
+  channel: GuildBasedChannel,
+  content: string = message.content,
+): string {
   const mention = `<#${channel.id}>`;
-  const mentionIndex = message.content.indexOf(mention);
+  const mentionIndex = content.indexOf(mention);
   return mentionIndex < 0
     ? ""
-    : message.content.slice(mentionIndex + mention.length).trim();
+    : content.slice(mentionIndex + mention.length).trim();
 }
 
 function isSingleUnicodeEmoji(value: string): boolean {
@@ -374,11 +378,12 @@ async function handleMemberMessageCommand(
   message: Message,
   kind: GuildMessageKind,
   client: Client,
+  content: string = message.content,
 ): Promise<void> {
   if (!message.guild || !(await requireManageServer(message))) return;
 
   const label = kind === "welcome" ? "Welcome" : kind === "boost" ? "Boost" : "Goodbye";
-  const args = message.content.trim().split(/\s+/);
+  const args = content.trim().split(/\s+/);
   const action = args[1]?.toLowerCase();
   if (action === "test" && kind !== "goodbye") {
     const member = message.member ?? await message.guild.members.fetch(message.author.id).catch(() => null);
@@ -464,11 +469,11 @@ async function handleMemberMessageCommand(
   }
 
   const channel = mentionedTextChannel(message);
-  const template = channel ? textAfterChannelMention(message, channel) : "";
+  const template = channel ? textAfterChannelMention(message, channel, content) : "";
   if (action !== "set" || !channel || !template || template.length > 1_800) {
     await message.reply({
       content:
-        `ℹ️ Usage: \`!${kind} set #channel <message>\`, \`!${kind} remove\`${kind === "goodbye" ? "" : `, \`!${kind} embed #channel [embed-name]\`, or \`!${kind} test\``}.\n` +
+        `ℹ️ Usage: \`!set ${kind} channel #channel <message or {embed:name}>\`, \`!${kind} remove\`${kind === "goodbye" ? "" : `, \`!${kind} embed #channel [embed-name]\`, or \`!${kind} test\``}.\n` +
         "Placeholders: `{user}`, `{user_tag}` (nickname), `{server}`, `{memberCount}`, and `{boostCount}`.",
       allowedMentions: { parse: [], repliedUser: false },
     });
@@ -505,6 +510,18 @@ async function handleMemberMessageCommand(
   } catch (error) {
     await saveFailure(message, `${kind} message`, error);
   }
+}
+
+/** `!set <welcome|boost|goodbye> channel #channel <message or {embed:name}>` */
+export function handleSetGreetingCommand(message: Message, client: Client): Promise<boolean> {
+  const match = /^!set\s+(welcome|boost|goodbye)\s+channel\b([\s\S]*)$/i.exec(message.content.trim());
+  if (!match) return Promise.resolve(false);
+  const kind = match[1]!.toLowerCase() as GuildMessageKind;
+  return handleMemberMessageCommand(message, kind, client, `!${kind} set${match[2]}`).then(() => true);
+}
+
+export function handleGoodbyeCommand(message: Message, client: Client): Promise<void> {
+  return handleMemberMessageCommand(message, "goodbye", client);
 }
 
 export function handleWelcomeCommand(message: Message, client: Client): Promise<void> {
