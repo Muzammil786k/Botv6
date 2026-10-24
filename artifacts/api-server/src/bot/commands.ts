@@ -62,7 +62,7 @@ import { handleGuildTagRoleCommand } from "./guildTagRole";
 import { handleAutoEmergencyCommand } from "./emergency";
 import { logger } from "../lib/logger";
 
-const PREFIX = "g";
+const PREFIX = "!";
 
 export async function handleMessage(
   client: Client,
