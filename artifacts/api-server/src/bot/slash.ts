@@ -299,6 +299,271 @@ const slashCommands = [
     .setDescription("Get a playful compatibility score for two members.")
     .addUserOption((o) => o.setName("user1").setDescription("First member").setRequired(true))
     .addUserOption((o) => o.setName("user2").setDescription("Second member").setRequired(true)),
+
+  // ── Newly added commands for complete coverage ─────────────────────────────
+  new SlashCommandBuilder()
+    .setName("creditdrop")
+    .setDescription("Configure timed credit drops.")
+    .addSubcommand((sub) =>
+      sub
+        .setName("setup")
+        .setDescription("Setup credit drop channel and optional interval.")
+        .addChannelOption((o) => o.setName("channel").setDescription("Text channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
+        .addStringOption((o) => o.setName("interval").setDescription("Interval e.g. 30m or 1h")),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("remove")
+        .setDescription("Remove credit drops from a channel.")
+        .addChannelOption((o) => o.setName("channel").setDescription("Text channel").addChannelTypes(ChannelType.GuildText).setRequired(true)),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("interval")
+        .setDescription("Change credit drop interval.")
+        .addStringOption((o) => o.setName("interval").setDescription("Interval e.g. 30m or 1h").setRequired(true))
+        .addChannelOption((o) => o.setName("channel").setDescription("Optional text channel").addChannelTypes(ChannelType.GuildText)),
+    )
+    .addSubcommand((sub) => sub.setName("status").setDescription("View credit drop settings."))
+    .addSubcommand((sub) =>
+      sub
+        .setName("pause")
+        .setDescription("Pause credit drops.")
+        .addChannelOption((o) => o.setName("channel").setDescription("Optional text channel").addChannelTypes(ChannelType.GuildText)),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("resume")
+        .setDescription("Resume credit drops.")
+        .addChannelOption((o) => o.setName("channel").setDescription("Optional text channel").addChannelTypes(ChannelType.GuildText)),
+    ),
+
+  new SlashCommandBuilder()
+    .setName("flagdrop")
+    .setDescription("Configure country flag drops.")
+    .addSubcommand((sub) =>
+      sub
+        .setName("setup")
+        .setDescription("Setup flag drop channel and optional interval.")
+        .addChannelOption((o) => o.setName("channel").setDescription("Text channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
+        .addStringOption((o) => o.setName("interval").setDescription("Interval e.g. 30m or 1h")),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("remove")
+        .setDescription("Remove flag drops from a channel.")
+        .addChannelOption((o) => o.setName("channel").setDescription("Text channel").addChannelTypes(ChannelType.GuildText).setRequired(true)),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("interval")
+        .setDescription("Change flag drop interval.")
+        .addStringOption((o) => o.setName("interval").setDescription("Interval e.g. 30m or 1h").setRequired(true))
+        .addChannelOption((o) => o.setName("channel").setDescription("Optional text channel").addChannelTypes(ChannelType.GuildText)),
+    )
+    .addSubcommand((sub) => sub.setName("status").setDescription("View flag drop settings."))
+    .addSubcommand((sub) =>
+      sub
+        .setName("pause")
+        .setDescription("Pause flag drops.")
+        .addChannelOption((o) => o.setName("channel").setDescription("Optional text channel").addChannelTypes(ChannelType.GuildText)),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("resume")
+        .setDescription("Resume flag drops.")
+        .addChannelOption((o) => o.setName("channel").setDescription("Optional text channel").addChannelTypes(ChannelType.GuildText)),
+    ),
+
+  new SlashCommandBuilder()
+    .setName("credit")
+    .setDescription("Check your or another member's credit balance.")
+    .addUserOption((o) => o.setName("user").setDescription("Member")),
+  new SlashCommandBuilder()
+    .setName("credits")
+    .setDescription("Check your or another member's credit balance.")
+    .addUserOption((o) => o.setName("user").setDescription("Member")),
+
+  new SlashCommandBuilder()
+    .setName("topcredits")
+    .setDescription("Show the credit leaderboard."),
+
+  new SlashCommandBuilder()
+    .setName("shop")
+    .setDescription("View or purchase roles from the role shop.")
+    .addStringOption((o) => o.setName("args").setDescription("Action or role name e.g. buy <role>")),
+
+  new SlashCommandBuilder()
+    .setName("steal")
+    .setDescription("Steal a custom emoji or sticker from a message or URL.")
+    .addStringOption((o) => o.setName("source").setDescription("Emoji, emoji ID, image URL, or message link").setRequired(true))
+    .addStringOption((o) => o.setName("name").setDescription("Custom name for the new emoji")),
+
+  new SlashCommandBuilder()
+    .setName("embed")
+    .setDescription("Manage custom server embeds.")
+    .addStringOption((o) => o.setName("action").setDescription("Action, e.g. list, show <name>, new <name>, edit <name> <key> <val>").setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName("autoresponder")
+    .setDescription("Configure auto responders.")
+    .addSubcommand((sub) =>
+      sub
+        .setName("set")
+        .setDescription("Set an auto responder.")
+        .addStringOption((o) => o.setName("trigger").setDescription("Trigger text").setRequired(true))
+        .addStringOption((o) => o.setName("response").setDescription("Response text").setRequired(true)),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("remove")
+        .setDescription("Remove an auto responder.")
+        .addStringOption((o) => o.setName("trigger").setDescription("Trigger text").setRequired(true)),
+    )
+    .addSubcommand((sub) => sub.setName("status").setDescription("View auto responders.")),
+
+  new SlashCommandBuilder()
+    .setName("goodbye")
+    .setDescription("Configure goodbye messages.")
+    .addSubcommand((sub) =>
+      sub
+        .setName("set")
+        .setDescription("Set goodbye channel and message.")
+        .addChannelOption((o) => o.setName("channel").setDescription("Text channel").addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setRequired(true))
+        .addStringOption((o) => o.setName("message").setDescription("Goodbye message text").setRequired(true)),
+    )
+    .addSubcommand((sub) => sub.setName("remove").setDescription("Disable goodbye messages.")),
+
+  new SlashCommandBuilder()
+    .setName("boost")
+    .setDescription("Configure server boost messages.")
+    .addSubcommand((sub) =>
+      sub
+        .setName("set")
+        .setDescription("Set boost channel and message.")
+        .addChannelOption((o) => o.setName("channel").setDescription("Text channel").addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setRequired(true))
+        .addStringOption((o) => o.setName("message").setDescription("Boost message text").setRequired(true)),
+    )
+    .addSubcommand((sub) => sub.setName("remove").setDescription("Disable boost messages.")),
+
+  new SlashCommandBuilder()
+    .setName("reminder")
+    .setDescription("Set or manage reminders.")
+    .addSubcommand((sub) =>
+      sub
+        .setName("start")
+        .setDescription("Set a reminder.")
+        .addStringOption((o) => o.setName("duration").setDescription("Duration e.g. 30m, 1h").setRequired(true))
+        .addStringOption((o) => o.setName("text").setDescription("Reminder text").setRequired(true)),
+    )
+    .addSubcommand((sub) => sub.setName("clear").setDescription("Clear active reminders.")),
+
+  new SlashCommandBuilder()
+    .setName("timer")
+    .setDescription("Set a timer.")
+    .addStringOption((o) => o.setName("duration").setDescription("Duration e.g. 10m").setRequired(true))
+    .addStringOption((o) => o.setName("text").setDescription("Timer text")),
+
+  new SlashCommandBuilder()
+    .setName("statusrole")
+    .setDescription("Configure status roles.")
+    .addSubcommand((sub) =>
+      sub
+        .setName("set")
+        .setDescription("Set a status role.")
+        .addRoleOption((o) => o.setName("role").setDescription("Role to award").setRequired(true))
+        .addStringOption((o) => o.setName("text").setDescription("Required status text").setRequired(true))
+        .addChannelOption((o) => o.setName("channel").setDescription("Announcement channel").addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)),
+    )
+    .addSubcommand((sub) => sub.setName("remove").setDescription("Remove status role configuration."))
+    .addSubcommand((sub) => sub.setName("status").setDescription("View status role settings.")),
+
+  new SlashCommandBuilder()
+    .setName("guildtagrole")
+    .setDescription("Configure guild tag roles.")
+    .addSubcommand((sub) =>
+      sub
+        .setName("set")
+        .setDescription("Set a guild tag role.")
+        .addRoleOption((o) => o.setName("role").setDescription("Role to award").setRequired(true))
+        .addStringOption((o) => o.setName("text").setDescription("Required tag text").setRequired(true))
+        .addChannelOption((o) => o.setName("channel").setDescription("Announcement channel").addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)),
+    )
+    .addSubcommand((sub) => sub.setName("remove").setDescription("Remove guild tag role configuration."))
+    .addSubcommand((sub) => sub.setName("status").setDescription("View guild tag role settings.")),
+
+  new SlashCommandBuilder()
+    .setName("emergency")
+    .setDescription("Configure emergency protections.")
+    .addSubcommand((sub) => sub.setName("status").setDescription("View emergency settings."))
+    .addSubcommand((sub) => sub.setName("restore").setDescription("Restore emergency protections."))
+    .addSubcommand((sub) =>
+      sub
+        .setName("set")
+        .setDescription("Set emergency threshold.")
+        .addStringOption((o) => o.setName("event").setDescription("Event type").setRequired(true))
+        .addIntegerOption((o) => o.setName("limit").setDescription("Limit count").setMinValue(1).setRequired(true)),
+    ),
+
+  new SlashCommandBuilder()
+    .setName("automod")
+    .setDescription("Configure auto moderation.")
+    .addStringOption((o) => o.setName("args").setDescription("Automod parameters")),
+
+  new SlashCommandBuilder()
+    .setName("modlimit")
+    .setDescription("Configure moderation limits.")
+    .addSubcommand((sub) =>
+      sub
+        .setName("set")
+        .setDescription("Set limit for action.")
+        .addStringOption((o) => o.setName("action").setDescription("Action type e.g. warn, mute").setRequired(true))
+        .addIntegerOption((o) => o.setName("limit").setDescription("Limit").setMinValue(1).setRequired(true)),
+    )
+    .addSubcommand((sub) => sub.setName("status").setDescription("View moderation limits."))
+    .addSubcommand((sub) => sub.setName("reset").setDescription("Reset moderation limits.")),
+
+  new SlashCommandBuilder()
+    .setName("hide")
+    .setDescription("Hide current channel or specified channel.")
+    .addChannelOption((o) => o.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText, ChannelType.GuildVoice)),
+
+  new SlashCommandBuilder()
+    .setName("unhide")
+    .setDescription("Unhide current channel or specified channel.")
+    .addChannelOption((o) => o.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText, ChannelType.GuildVoice)),
+
+  new SlashCommandBuilder()
+    .setName("roleinfo")
+    .setDescription("View information about a role.")
+    .addRoleOption((o) => o.setName("role").setDescription("Target role").setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName("banner")
+    .setDescription("View a member's banner.")
+    .addUserOption((o) => o.setName("user").setDescription("Optional member")),
+
+  new SlashCommandBuilder()
+    .setName("snipe")
+    .setDescription("Snipe the last deleted message in this channel."),
+
+  new SlashCommandBuilder()
+    .setName("quoterole")
+    .setDescription("Configure role required to create quotes.")
+    .addSubcommand((sub) =>
+      sub
+        .setName("set")
+        .setDescription("Set required role.")
+        .addRoleOption((o) => o.setName("role").setDescription("Authorized quote role").setRequired(true)),
+    )
+    .addSubcommand((sub) => sub.setName("status").setDescription("Show configured quote role."))
+    .addSubcommand((sub) => sub.setName("remove").setDescription("Remove quote role requirement.")),
+
+  new SlashCommandBuilder()
+    .setName("ticket")
+    .setDescription("Configure or open support tickets.")
+    .addStringOption((o) => o.setName("args").setDescription("Ticket parameters")),
+
   ...SOCIAL_ACTION_NAMES.map((name) =>
     new SlashCommandBuilder()
       .setName(name)
@@ -314,7 +579,7 @@ function mentionContent(interaction: ChatInputCommandInteraction, optionName: st
 
 function automationCommandContent(
   interaction: ChatInputCommandInteraction,
-  command: "autoreact" | "sticky" | "welcome",
+  command: "autoreact" | "sticky" | "welcome" | "goodbye" | "boost",
 ): string {
   const action = interaction.options.getSubcommand(false) ?? "set";
   const channel = interaction.options.getChannel("channel");
@@ -432,9 +697,90 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
       const category = interaction.options.getChannel("category");
       return `!jtc set ${lobby ? `<#${lobby.id}>` : ""} ${category ? `<#${category.id}>` : ""}`.trim();
     }
+    case "creditdrop":
+    case "flagdrop": {
+      const sub = interaction.options.getSubcommand(false) ?? "status";
+      const channel = interaction.options.getChannel("channel");
+      const channelText = channel ? `<#${channel.id}>` : "";
+      const interval = string("interval");
+      if (sub === "setup") return `!${name} setup ${channelText} ${interval}`.trim();
+      if (sub === "interval") return `!${name} interval ${interval} ${channelText}`.trim();
+      if (sub === "remove") return `!${name} remove ${channelText}`.trim();
+      if (sub === "pause" || sub === "resume") return `!${name} ${sub} ${channelText}`.trim();
+      return `!${name} status`;
+    }
+    case "credit":
+    case "credits":
+      return `!credit ${mentionContent(interaction, "user")}`.trim();
+    case "topcredits":
+      return "!top credits";
+    case "shop":
+      return `!shop ${string("args")}`.trim();
+    case "steal":
+      return `!steal ${string("source")} ${string("name")}`.trim();
+    case "embed":
+      return `!embed ${string("action")}`.trim();
+    case "autoresponder": {
+      const sub = interaction.options.getSubcommand(false) ?? "status";
+      if (sub === "status") return "!autoresponder status";
+      const trigger = string("trigger");
+      const response = string("response");
+      return `!autoresponder ${sub} ${trigger} ${response}`.trim();
+    }
+    case "reminder": {
+      const sub = interaction.options.getSubcommand(false) ?? "clear";
+      if (sub === "clear") return "!reminder clear";
+      return `!reminder start ${string("duration")} ${string("text")}`.trim();
+    }
+    case "timer":
+      return `!timer ${string("duration")} ${string("text")}`.trim();
+    case "statusrole":
+    case "guildtagrole": {
+      const sub = interaction.options.getSubcommand(false) ?? "status";
+      if (sub === "status" || sub === "remove") return `!${name} ${sub}`;
+      const role = interaction.options.getRole("role");
+      const text = string("text");
+      const channel = interaction.options.getChannel("channel");
+      return `!${name} set ${role ? `<@&${role.id}>` : ""} ${text} ${channel ? `<#${channel.id}>` : ""}`.trim();
+    }
+    case "emergency": {
+      const sub = interaction.options.getSubcommand(false) ?? "status";
+      if (sub === "status" || sub === "restore") return `!auto emergency ${sub}`;
+      return `!auto emergency set ${string("event")} ${integer("limit")}`.trim();
+    }
+    case "automod":
+      return `!automod ${string("args")}`.trim();
+    case "modlimit": {
+      const sub = interaction.options.getSubcommand(false) ?? "status";
+      if (sub === "status" || sub === "reset") return `!modlimit ${sub}`;
+      return `!modlimit set ${string("action")} ${integer("limit")}`.trim();
+    }
+    case "hide":
+    case "unhide": {
+      const channel = interaction.options.getChannel("channel");
+      return `!${name} ${channel ? `<#${channel.id}>` : ""}`.trim();
+    }
+    case "roleinfo": {
+      const role = interaction.options.getRole("role");
+      return `!roleinfo ${role ? `<@&${role.id}>` : ""}`.trim();
+    }
+    case "banner":
+      return `!banner ${mentionContent(interaction, "user")}`.trim();
+    case "snipe":
+      return "!snipe";
+    case "quoterole": {
+      const sub = interaction.options.getSubcommand(false) ?? "status";
+      if (sub === "status" || sub === "remove") return `!quoterole ${sub}`;
+      const role = interaction.options.getRole("role");
+      return `!quoterole set ${role ? `<@&${role.id}>` : ""}`.trim();
+    }
+    case "ticket":
+      return `!ticket ${string("args")}`.trim();
     case "autoreact":
     case "sticky":
     case "welcome":
+    case "goodbye":
+    case "boost":
       return automationCommandContent(interaction, name);
     default:
       return `!${name}`;
