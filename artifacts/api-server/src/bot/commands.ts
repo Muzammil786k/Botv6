@@ -115,11 +115,11 @@ export async function handleMessage(
   }
 
   // ── Giveaway ──────────────────────────────────────────────────────────────
-  if (lower === `!${PREFIX}start` || lower.startsWith(`!${PREFIX}start `)) {
+  if (lower === "!gstart" || lower.startsWith("!gstart ") || lower === `!${PREFIX}start` || lower.startsWith(`!${PREFIX}start `)) {
     await handleGstart(client, message);
-  } else if (lower === `!${PREFIX}end` || lower.startsWith(`!${PREFIX}end `)) {
+  } else if (lower === "!gend" || lower.startsWith("!gend ") || lower === `!${PREFIX}end` || lower.startsWith(`!${PREFIX}end `)) {
     await handleGend(client, message);
-  } else if (lower === `!${PREFIX}reroll` || lower.startsWith(`!${PREFIX}reroll `)) {
+  } else if (lower === "!greroll" || lower.startsWith("!greroll ") || lower === `!${PREFIX}reroll` || lower.startsWith(`!${PREFIX}reroll `)) {
     await handleGreroll(client, message);
 
   // ── Help ──────────────────────────────────────────────────────────────────
