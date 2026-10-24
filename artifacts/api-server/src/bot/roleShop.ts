@@ -18,6 +18,7 @@ const EMBED_COLOR = 0x2b2d31;
 const MAX_ROLE_PRICE = 2_147_483_647;
 const MAX_CREDIT_BALANCE = 2_147_483_647;
 const ROLES_PER_PAGE = 10;
+const CREDIT_LEADERBOARD_PAGE_SIZE = 10;
 
 function replyEmbed(title: string, description: string): { embeds: EmbedBuilder[] } {
   return { embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle(title).setDescription(description)] };
@@ -152,6 +153,84 @@ export async function handleCreditCommand(message: Message): Promise<void> {
   } catch (error) {
     logger.error({ err: error, guildId: guild.id, userId: message.author.id }, "Could not load user credits");
     await message.reply(replyEmbed("Credits unavailable", "I couldn't load your credit balance. Please try again."));
+  }
+}
+
+export async function handleCreditLeaderboardCommand(message: Message): Promise<void> {
+  const guild = message.guild;
+  if (!guild) return;
+
+  let currentPage = 0;
+  let hasNextPage = false;
+
+  const buildPage = async (page: number) => {
+    const entries = await db.select({
+      userId: botMiningProfilesTable.userId,
+      credits: botMiningProfilesTable.coins,
+    })
+      .from(botMiningProfilesTable)
+      .where(and(
+        eq(botMiningProfilesTable.guildId, guild.id),
+        gt(botMiningProfilesTable.coins, 0),
+      ))
+      .orderBy(desc(botMiningProfilesTable.coins), asc(botMiningProfilesTable.userId))
+      .limit(CREDIT_LEADERBOARD_PAGE_SIZE + 1)
+      .offset(page * CREDIT_LEADERBOARD_PAGE_SIZE);
+
+    hasNextPage = entries.length > CREDIT_LEADERBOARD_PAGE_SIZE;
+    const pageEntries = entries.slice(0, CREDIT_LEADERBOARD_PAGE_SIZE);
+    const description = pageEntries.length > 0
+      ? pageEntries.map((entry, index) =>
+          `**${page * CREDIT_LEADERBOARD_PAGE_SIZE + index + 1}.** <@${entry.userId}> — **${entry.credits.toLocaleString()} credits**`,
+        ).join("\n")
+      : "No users have earned credits yet.";
+    const components = pageEntries.length > 0
+      ? [new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId("credits-leaderboard:previous")
+            .setLabel("Previous")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page === 0),
+          new ButtonBuilder()
+            .setCustomId("credits-leaderboard:next")
+            .setLabel("Next")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(!hasNextPage),
+        )]
+      : [];
+
+    return {
+      embeds: [new EmbedBuilder()
+        .setColor(EMBED_COLOR)
+        .setTitle(`Credit leaderboard • Page ${page + 1}`)
+        .setDescription(description)],
+      components,
+    };
+  };
+
+  try {
+    const leaderboardMessage = await message.reply(await buildPage(currentPage));
+    if (leaderboardMessage.components.length === 0) return;
+
+    const collector = leaderboardMessage.createMessageComponentCollector({
+      componentType: ComponentType.Button,
+      time: 120_000,
+    });
+    collector.on("collect", async (interaction) => {
+      if (interaction.user.id !== message.author.id) {
+        await interaction.reply({ content: "Only the person who opened this leaderboard can change its page.", ephemeral: true });
+        return;
+      }
+      currentPage += interaction.customId === "credits-leaderboard:next" ? 1 : -1;
+      currentPage = Math.max(0, currentPage);
+      await interaction.update(await buildPage(currentPage));
+    });
+    collector.on("end", async () => {
+      await leaderboardMessage.edit({ components: [] }).catch(() => {});
+    });
+  } catch (error) {
+    logger.error({ err: error, guildId: guild.id }, "Could not load the credits leaderboard");
+    await message.reply(replyEmbed("Leaderboard unavailable", "I couldn't load the credits leaderboard. Please try again."));
   }
 }
 

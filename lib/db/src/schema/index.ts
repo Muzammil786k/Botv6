@@ -31,6 +31,7 @@ export * from "./bot-experience-settings";
 export * from "./bot-level-roles";
 export * from "./bot-experience-preferences";
 export * from "./bot-crate-settings";
+export * from "./bot-flag-drop-settings";
 export * from "./bot-credit-airdrops";
 export * from "./bot-experience-boosts";
 export * from "./bot-tickets";

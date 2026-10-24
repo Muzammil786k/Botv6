@@ -51,9 +51,10 @@ import { handleModerationLimitCommand } from "./moderationLimits";
 import { handleSetGameCommand } from "./gameChannel";
 import { handleTruthOrDare } from "./truthordare";
 import { handleQuoteRoleCommand, handleSetQuoteCommand } from "./quoteChannel";
-import { handleCreditCommand, handleRoleShopCommand, handleTopCreditsCommand } from "./roleShop";
+import { handleCreditCommand, handleCreditLeaderboardCommand, handleRoleShopCommand } from "./roleShop";
 import { awardChatCredits, handleActiveChatRewardChannelCommand } from "./credits";
 import { handleCreditDropCommand } from "./crates";
+import { handleFlagDropAnswer, handleFlagDropCommand } from "./flagDrop";
 import { handleCreditAirdropCommand } from "./creditAirdrop";
 import { handleEmbedCommand } from "./embeds";
 import { handleStatusRoleCommand } from "./statusRole";
@@ -84,12 +85,20 @@ export async function handleMessage(
 
   await handleAfk(message, content);
 
+  if (!raw.startsWith("!")) {
+    await handleFlagDropAnswer(message);
+  }
+
   if (!content.startsWith("!") && !noPrefix) return;
 
   const lower = content.toLowerCase();
 
   if (lower === "!creditdrop" || lower.startsWith("!creditdrop ")) {
     await handleCreditDropCommand(message);
+    return;
+  }
+  if (lower === "!flagdrop" || lower.startsWith("!flagdrop ")) {
+    await handleFlagDropCommand(message);
     return;
   }
   if (lower === "!setchatreward" || lower.startsWith("!setchatreward ")) {
@@ -230,7 +239,7 @@ export async function handleMessage(
   } else if (lower === "!wbtop") {
     await handleWbTop(message);
   } else if (lower === "!top credits" || lower === "!top credit" || lower === "!topcredits") {
-    await handleTopCreditsCommand(message);
+    await handleCreditLeaderboardCommand(message);
   } else if (lower === "!credit" || lower.startsWith("!credit ") || lower === "!credits" || lower.startsWith("!credits ")) {
     await handleCreditCommand(message);
   } else if (lower === "!shop" || lower.startsWith("!shop ")) {

@@ -91,6 +91,7 @@ function applyEmbedOverride(embed: EmbedBuilder, settings: EmbedOverride): Embed
   if (settings.title !== null) embed.setTitle(settings.title);
   if (settings.description !== null) embed.setDescription(settings.description);
   if (settings.color) embed.setColor(Number.parseInt(settings.color.slice(1), 16));
+  if (settings.authorText !== null) embed.setAuthor({ name: settings.authorText });
   if (settings.imageUrl) embed.setImage(settings.imageUrl);
   if (settings.thumbnailUrl) embed.setThumbnail(settings.thumbnailUrl);
   if (settings.footerText !== null) embed.setFooter({ text: settings.footerText });

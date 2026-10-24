@@ -22,11 +22,25 @@ const CRATE_LIFETIME_MS = 10 * 60_000;
 const SCHEDULER_INTERVAL_MS = 30_000;
 const DROP_REACTIONS = ["🌦️", "🎁", "🍀", "💎", "⭐", "🪙", "🎈", "🍉"] as const;
 const LEGACY_REACTION = "🌦️";
-const CREDIT_DROP_TIERS = [
+export const CREDIT_DROP_TIERS = [
   { name: "Common", icon: "<:common:1558505660470010070>", min: 100, max: 200, weight: 70, color: 0x95a5a6 },
   { name: "Rare", icon: "<:rare:1562815035091329034>", min: 200, max: 500, weight: 25, color: 0x3498db },
   { name: "Epic", icon: "🌌", min: 500, max: 1000, weight: 5, color: 0xf1c40f },
 ] as const;
+export type CreditDropTier = (typeof CREDIT_DROP_TIERS)[number];
+
+export function chooseCreditDropReward(): {
+  tier: (typeof CREDIT_DROP_TIERS)[number];
+  creditReward: number;
+} {
+  let tierPick = Math.random() * CREDIT_DROP_TIERS.reduce((total, tier) => total + tier.weight, 0);
+  const tier = CREDIT_DROP_TIERS.find((candidate) => {
+    tierPick -= candidate.weight;
+    return tierPick < 0;
+  }) ?? CREDIT_DROP_TIERS[0];
+  const creditReward = Math.floor(Math.random() * (tier.max - tier.min + 1)) + tier.min;
+  return { tier, creditReward };
+}
 
 let scheduler: NodeJS.Timeout | undefined;
 let schedulerRunning = false;
@@ -34,12 +48,12 @@ let schedulerRunning = false;
 function creditDropEmbed(
   expiresAt: number,
   reaction: string,
-  tier: (typeof CREDIT_DROP_TIERS)[number],
+  tier: CreditDropTier,
   creditReward: number,
 ): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(tier.color)
-    .setTitle("Credit Drop!")
+    .setAuthor({ name: "A Mysterious Crate Has Appeared!" })
     .setDescription(
       "<:click:1558393065616707674> **React** to this message with the emoji below to win!\n\n" +
       `<:reaction:1558393068254666785>  **Reaction:** ${reaction}\n` +
@@ -280,12 +294,7 @@ async function spawnCreditDrop(
     throw new Error(`Configured credit drop channel ${settings.channelId} is unavailable or not a text channel`);
   }
   const expiresAt = Date.now() + CRATE_LIFETIME_MS;
-  let tierPick = Math.random() * CREDIT_DROP_TIERS.reduce((total, tier) => total + tier.weight, 0);
-  const tier = CREDIT_DROP_TIERS.find((candidate) => {
-    tierPick -= candidate.weight;
-    return tierPick < 0;
-  }) ?? CREDIT_DROP_TIERS[0];
-  const creditReward = Math.floor(Math.random() * (tier.max - tier.min + 1)) + tier.min;
+  const { tier, creditReward } = chooseCreditDropReward();
   const reaction = DROP_REACTIONS[Math.floor(Math.random() * DROP_REACTIONS.length)]!;
   const message = await channel.send({ embeds: [creditDropEmbed(expiresAt, reaction, tier, creditReward)] });
   try {
@@ -380,7 +389,9 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
   if (reaction.message.partial) await reaction.message.fetch();
   if (!reaction.message.guild) return;
   if (!reaction.message.embeds.some((embed) =>
-    embed.title === "Credit Drop!" || embed.title === "A Credit Drop Has Appeared!"
+    embed.author?.name === "A Mysterious Crate Has Appeared!" ||
+    embed.title === "Credit Drop!" ||
+    embed.title === "A Credit Drop Has Appeared!"
   )) return;
 
   const now = Date.now();
@@ -408,7 +419,10 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
     await tx.insert(botMiningProfilesTable)
       .values({ guildId: settings.guildId, userId: user.id })
       .onConflictDoNothing();
-    const [profile] = await tx.select({ coins: botMiningProfilesTable.coins })
+    const [profile] = await tx.select({
+      coins: botMiningProfilesTable.coins,
+      creditDropsClaimed: botMiningProfilesTable.creditDropsClaimed,
+    })
       .from(botMiningProfilesTable)
       .where(and(
         eq(botMiningProfilesTable.guildId, settings.guildId),
@@ -421,8 +435,9 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
       ?? CREDIT_DROP_TIERS.find((candidate) => credits >= candidate.min && credits <= candidate.max)
       ?? CREDIT_DROP_TIERS[0];
     const balance = profile.coins + credits;
+    const userCreditDropsClaimed = profile.creditDropsClaimed + 1;
     await tx.update(botMiningProfilesTable)
-      .set({ coins: balance, updatedAt: new Date(now) })
+      .set({ coins: balance, creditDropsClaimed: userCreditDropsClaimed, updatedAt: new Date(now) })
       .where(and(
         eq(botMiningProfilesTable.guildId, settings.guildId),
         eq(botMiningProfilesTable.userId, user.id),
@@ -442,7 +457,7 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
         eq(botCrateSettingsTable.guildId, settings.guildId),
         eq(botCrateSettingsTable.channelId, settings.channelId),
       ));
-    return { credits, balance, totalCreditDropsClaimed, tier };
+    return { credits, balance, userCreditDropsClaimed, tier };
   });
 
   if (!result) return;
@@ -454,7 +469,7 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
           .setColor(result.tier.color)
           .setDescription(
             `${result.tier.icon} **${result.tier.name}** · <@${user.id}> received <:credits:1558505663531851933> **__${result.credits}__** **credits!**\n\n` +
-            `<a:gift:1558505667038289990> Total Crates Claimed: \`${result.totalCreditDropsClaimed.toLocaleString()}\`\n` +
+            `<a:gift:1558505667038289990> Your Crates Claimed: \`${result.userCreditDropsClaimed.toLocaleString()}\`\n` +
             "Use `!credits` to view your credits",
           )
           .setFooter({ text: "This reward is given randomly to an active chatter" })

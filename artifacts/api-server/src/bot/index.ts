@@ -17,6 +17,7 @@ import { handleTicketInteraction } from "./tickets";
 import { logger } from "../lib/logger";
 import { processUserMessageAutomations, sendMemberMessage } from "./automation";
 import { handleCreditDropReaction, startCreditDropScheduler } from "./crates";
+import { startFlagDropScheduler } from "./flagDrop";
 import { handleCreditAirdropButton, startCreditAirdropScheduler } from "./creditAirdrop";
 import { handleStatusRolePresenceUpdate } from "./statusRole";
 import { handleGuildTagRoleUserUpdate } from "./guildTagRole";
@@ -53,6 +54,7 @@ export function createBot(): Client {
     logger.info({ tag: client.user?.tag }, "Discord bot is ready");
     client.user?.setActivity("🎉 Giveaways | !help | /help");
     startCreditDropScheduler(client);
+    startFlagDropScheduler(client);
     startCreditAirdropScheduler(client);
     startTempChannelCleanupScheduler(client);
     startReminderScheduler(client);

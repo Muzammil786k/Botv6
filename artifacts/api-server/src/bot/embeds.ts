@@ -26,8 +26,8 @@ import { logger } from "../lib/logger";
 import { invalidateEmbedOverrideCache } from "./presentation";
 import { setGuildMessage } from "./automation";
 
-type EditableField = "title" | "description" | "color" | "image" | "thumbnail" | "footer";
-type EditableColumn = "title" | "description" | "color" | "imageUrl" | "thumbnailUrl" | "footerText";
+type EditableField = "title" | "description" | "color" | "author" | "image" | "thumbnail" | "footer";
+type EditableColumn = "title" | "description" | "color" | "authorText" | "imageUrl" | "thumbnailUrl" | "footerText";
 type FieldValidation = { ok: true; value: string } | { ok: false; error: string };
 
 function parseColor(value: string): string | null {
@@ -51,6 +51,7 @@ function embedFromSettings(settings: {
   title: string | null;
   description: string | null;
   color: string | null;
+  authorText: string | null;
   imageUrl: string | null;
   thumbnailUrl: string | null;
   footerText: string | null;
@@ -59,6 +60,7 @@ function embedFromSettings(settings: {
   const embed = new EmbedBuilder().setTitle(settings.title ?? fallbackTitle);
   if (settings.description) embed.setDescription(settings.description);
   if (settings.color) embed.setColor(Number.parseInt(settings.color.slice(1), 16));
+  if (settings.authorText) embed.setAuthor({ name: settings.authorText });
   if (settings.imageUrl) embed.setImage(settings.imageUrl);
   if (settings.thumbnailUrl) embed.setThumbnail(settings.thumbnailUrl);
   if (settings.footerText) embed.setFooter({ text: settings.footerText });
@@ -82,7 +84,7 @@ function validateFieldValue(
       ? { ok: true, value: value.trim() }
       : { ok: false, error: "Use a valid `http://` or `https://` image URL." };
   }
-  const limit = field === "title" ? 256 : field === "footer" ? 2048 : 4096;
+  const limit = field === "title" || field === "author" ? 256 : field === "footer" ? 2048 : 4096;
   return value.length <= limit
     ? { ok: true, value }
     : { ok: false, error: `${field} must be ${limit} characters or fewer.` };
@@ -93,6 +95,7 @@ function toColumn(field: EditableField): EditableColumn {
     case "title": return "title";
     case "description": return "description";
     case "color": return "color";
+    case "author": return "authorText";
     case "image": return "imageUrl";
     case "thumbnail": return "thumbnailUrl";
     case "footer": return "footerText";
@@ -300,6 +303,7 @@ async function openEmbedModal(
     if (action === "text") {
       modal.addComponents(
         modalInput("title", "Title", TextInputStyle.Short, { value: settings.title ?? "", maxLength: 256, placeholder: "Enter reset to clear" }),
+        modalInput("author", "Author", TextInputStyle.Short, { value: settings.authorText ?? "", maxLength: 256, placeholder: "Enter reset to clear" }),
         modalInput("description", "Description", TextInputStyle.Paragraph, { value: settings.description ?? "", placeholder: "Enter reset to clear" }),
       );
     } else if (action === "style") {
@@ -452,9 +456,9 @@ async function handleEmbedModal(interaction: ModalSubmitInteraction, action: str
   }
 
   const fields: Array<[EditableField, string]> = action === "text"
-    ? [["title", "title"], ["description", "description"]]
+    ? [["title", "title"], ["author", "author"], ["description", "description"]]
     : [["color", "color"], ["image", "image"], ["thumbnail", "thumbnail"], ["footer", "footer"]];
-  const updates: Partial<Record<"title" | "description" | "color" | "imageUrl" | "thumbnailUrl" | "footerText", string | null>> = {};
+  const updates: Partial<Record<"title" | "description" | "color" | "authorText" | "imageUrl" | "thumbnailUrl" | "footerText", string | null>> = {};
   for (const [field, inputId] of fields) {
     const raw = interaction.fields.getTextInputValue(inputId).trim();
     if (!raw) continue;
@@ -603,7 +607,7 @@ export async function handleEmbedCommand(message: Message): Promise<void> {
     }
 
     if (action === "edit" || action === "override") {
-      const editMatch = /^(\S+)\s+(title|description|color|image|thumbnail|footer)\s+([\s\S]+)$/i.exec(rest);
+      const editMatch = /^(\S+)\s+(title|description|color|author|image|thumbnail|footer)\s+([\s\S]+)$/i.exec(rest);
       if (!editMatch) {
         await message.reply("❌ Usage: `!embed edit <name> <field> <value>` or `!embed override <command> <field> <value>`.");
         return;
@@ -629,7 +633,7 @@ export async function handleEmbedCommand(message: Message): Promise<void> {
     }
 
     if (action === "clear" || action === "override-clear") {
-      const clearMatch = /^(\S+)\s+(title|description|color|image|thumbnail|footer)$/i.exec(rest);
+      const clearMatch = /^(\S+)\s+(title|description|color|author|image|thumbnail|footer)$/i.exec(rest);
       if (!clearMatch) {
         await message.reply("❌ Usage: `!embed clear <name> <field>` or `!embed override-clear <command> <field>`.");
         return;
@@ -746,7 +750,7 @@ export async function handleEmbedCommand(message: Message): Promise<void> {
         return;
       }
       const embed = embedFromSettings(settings, settings.name);
-      if (!settings.title && !settings.description && !settings.fields.length && !settings.imageUrl && !settings.thumbnailUrl) {
+      if (!settings.title && !settings.description && !settings.authorText && !settings.fields.length && !settings.imageUrl && !settings.thumbnailUrl) {
         await message.reply("❌ Add some content before sending this embed.");
         return;
       }
