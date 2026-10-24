@@ -16,6 +16,15 @@ import { bumpStickyForChannel } from "./automation";
 import { premiumEmbed } from "./presentation";
 import { VC_HELP_TEXT } from "./joinToCreate";
 
+function legacyCommand(name: string, description: string) {
+  return new SlashCommandBuilder()
+    .setName(name)
+    .setDescription(description)
+    .addStringOption((option) =>
+      option.setName("arguments").setDescription("Command arguments").setMaxLength(1800),
+    );
+}
+
 const slashCommands = [
   new SlashCommandBuilder()
     .setName("help")
@@ -299,6 +308,61 @@ const slashCommands = [
     .setDescription("Get a playful compatibility score for two members.")
     .addUserOption((o) => o.setName("user1").setDescription("First member").setRequired(true))
     .addUserOption((o) => o.setName("user2").setDescription("Second member").setRequired(true)),
+  ...[
+    ["autoresponder", "Configure automatic message responses."],
+    ["goodbye", "Configure server goodbye messages."],
+    ["boost", "Configure server boost messages."],
+    ["reminder", "Create or manage a reminder."],
+    ["timer", "Create or manage a timer."],
+    ["statusrole", "Configure status roles."],
+    ["guildtagrole", "Configure guild tag roles."],
+    ["automod", "Configure automatic moderation."],
+    ["modlimit", "Configure member moderation action limits."],
+    ["hide", "Hide a channel from members."],
+    ["unhide", "Unhide a channel for members."],
+    ["roleinfo", "View information about a role."],
+    ["membercount", "Show server member counts."],
+    ["banner", "View a member's banner."],
+    ["snipe", "Show the most recently deleted message."],
+    ["quoterole", "Configure the role required to create quote cards."],
+    ["tod", "Play Truth or Dare."],
+    ["wb", "Start a Word Bomb game."],
+    ["wordbomb-stop", "Stop the current Word Bomb game."],
+    ["topcredits", "Show the credit leaderboard."],
+    ["credits", "View or manage credits."],
+    ["credit", "View or manage credits."],
+    ["shop", "Browse or manage the role shop."],
+    ["steal", "Steal an eligible emoji or sticker."],
+    ["v", "Manage your temporary voice channel."],
+    ["vc", "Manage your temporary voice channel."],
+    ["ticket", "Manage support tickets."],
+    ["creditdrop", "Create or manage a credit drop."],
+    ["flagdrop", "Create or manage a country flag drop."],
+    ["embed", "Create or manage an embed."],
+    ["clearwarn", "Clear a member's warnings."],
+    ["emergency", "Configure automatic emergency responses."],
+  ].map(([name, description]) => legacyCommand(name, description)),
+  new SlashCommandBuilder()
+    .setName("setgreeting")
+    .setDescription("Set a welcome, boost, or goodbye message channel.")
+    .addStringOption((option) => option
+      .setName("type")
+      .setDescription("Greeting type")
+      .setRequired(true)
+      .addChoices(
+        { name: "Welcome", value: "welcome" },
+        { name: "Boost", value: "boost" },
+        { name: "Goodbye", value: "goodbye" },
+      ))
+    .addChannelOption((option) => option
+      .setName("channel")
+      .setDescription("Text channel")
+      .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+      .setRequired(true)),
+  new SlashCommandBuilder()
+    .setName("top")
+    .setDescription("Show a leaderboard.")
+    .addSubcommand((sub) => sub.setName("credits").setDescription("Show the credit leaderboard.")),
   ...SOCIAL_ACTION_NAMES.map((name) =>
     new SlashCommandBuilder()
       .setName(name)
@@ -425,6 +489,17 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
       const channel = interaction.options.getChannel("channel");
       return `!announce ${channel ? `<#${channel.id}>` : ""} ${string("message")}`.trim();
     }
+    case "setgreeting": {
+      const channel = interaction.options.getChannel("channel");
+      const type = string("type");
+      return `!set ${type} channel ${channel ? `<#${channel.id}>` : ""}`.trim();
+    }
+    case "emergency":
+      return `!auto emergency ${string("arguments")}`.trim();
+    case "wordbomb-stop":
+      return "!wordbomb stop";
+    case "top":
+      return `!top ${interaction.options.getSubcommand(false) ?? "credits"}`;
     case "jtc": {
       const action = interaction.options.getSubcommand(false) ?? "status";
       if (action !== "set") return `!jtc ${action}`;
@@ -437,7 +512,7 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
     case "welcome":
       return automationCommandContent(interaction, name);
     default:
-      return `!${name}`;
+      return `!${name} ${string("arguments")}`.trim();
   }
 }
 
@@ -451,8 +526,20 @@ async function createMessageAdapter(interaction: ChatInputCommandInteraction, co
   const selectedMembers = new Collection<string, GuildMember>();
   const selectedRoles = new Collection<string, Role>();
 
-  for (const option of ["user", "user1", "user2"]) {
-    const selected = interaction.options.getUser(option);
+  const userIds = new Set(
+    ["user", "user1", "user2"]
+      .map((option) => interaction.options.getUser(option)?.id)
+      .filter((id): id is string => Boolean(id)),
+  );
+  for (const match of content.matchAll(/<@!?(\d{17,20})>/g)) userIds.add(match[1]);
+  for (const userId of userIds) {
+    const selected = interaction.options.getUser("user")?.id === userId
+      ? interaction.options.getUser("user")
+      : interaction.options.getUser("user1")?.id === userId
+        ? interaction.options.getUser("user1")
+        : interaction.options.getUser("user2")?.id === userId
+          ? interaction.options.getUser("user2")
+          : await guild.client.users.fetch(userId).catch(() => null);
     if (selected) {
       selectedUsers.set(selected.id, selected);
       const selectedMember = guild.members.cache.get(selected.id) ?? await guild.members.fetch(selected.id).catch(() => null);
@@ -461,15 +548,21 @@ async function createMessageAdapter(interaction: ChatInputCommandInteraction, co
   }
 
   const selectedRole = interaction.options.getRole("role");
-  const role = selectedRole
-    ? guild.roles.cache.get(selectedRole.id) ?? await guild.roles.fetch(selectedRole.id).catch(() => null)
-    : undefined;
-  if (role) selectedRoles.set(role.id, role);
+  if (selectedRole) selectedRoles.set(selectedRole.id, selectedRole);
+  const roleIds = [...content.matchAll(/<@&(\d{17,20})>/g)].map((match) => match[1]);
+  for (const roleId of roleIds) {
+    const role = guild.roles.cache.get(roleId) ?? await guild.roles.fetch(roleId).catch(() => null);
+    if (role) selectedRoles.set(role.id, role);
+  }
 
   const channel = interaction.channel;
   const mentionedChannel = interaction.options.getChannel("channel") ?? channel;
   const selectedChannels = new Collection<string, any>();
   if (mentionedChannel) selectedChannels.set(mentionedChannel.id, mentionedChannel);
+  for (const match of content.matchAll(/<#(\d{17,20})>/g)) {
+    const selectedChannel = guild.channels.cache.get(match[1]) ?? await guild.channels.fetch(match[1]).catch(() => null);
+    if (selectedChannel) selectedChannels.set(selectedChannel.id, selectedChannel);
+  }
   const mentions = {
     users: selectedUsers,
     members: selectedMembers,

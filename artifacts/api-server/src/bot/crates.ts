@@ -457,7 +457,7 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
         eq(botCrateSettingsTable.guildId, settings.guildId),
         eq(botCrateSettingsTable.channelId, settings.channelId),
       ));
-    return { credits, balance, userCreditDropsClaimed, tier };
+    return { credits, balance, totalCreditDropsClaimed, tier };
   });
 
   if (!result) return;
@@ -469,7 +469,7 @@ export async function handleCreditDropReaction(reaction: MessageReaction, user: 
           .setColor(result.tier.color)
           .setDescription(
             `${result.tier.icon} **${result.tier.name}** · <@${user.id}> received <:credits:1558505663531851933> **__${result.credits}__** **credits!**\n\n` +
-            `<a:gift:1558505667038289990> Your Crates Claimed: \`${result.userCreditDropsClaimed.toLocaleString()}\`\n` +
+            `<a:gift:1558505667038289990> Total Crates Claimed: \`${result.totalCreditDropsClaimed.toLocaleString()}\`\n` +
             "Use `!credits` to view your credits",
           )
           .setFooter({ text: "This reward is given randomly to an active chatter" })

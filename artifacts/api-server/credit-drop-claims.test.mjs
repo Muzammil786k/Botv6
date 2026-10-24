@@ -21,7 +21,7 @@ function loadTypeScriptModule(relativePath, mocks = {}) {
   return module.exports;
 }
 
-test("credit-drop winner embed displays that user's personal claim count", async () => {
+test("credit-drop winner embed displays the updated total claim count", async () => {
   const settingsTable = {
     guildId: "settings.guildId",
     channelId: "settings.channelId",
@@ -136,6 +136,6 @@ test("credit-drop winner embed displays that user's personal claim count", async
   assert.equal(profile.coins, 500);
   assert.equal(profile.creditDropsClaimed, 9);
   assert.equal(settings.totalCreditDropsClaimed, 21);
-  assert.match(replies[0].embeds[0].description, /Your Crates Claimed: `9`/);
-  assert.doesNotMatch(replies[0].embeds[0].description, /`21`/);
+  assert.match(replies[0].embeds[0].description, /Total Crates Claimed: `21`/);
+  assert.doesNotMatch(replies[0].embeds[0].description, /Your Crates Claimed/);
 });
