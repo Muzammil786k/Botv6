@@ -7,7 +7,7 @@ import {
 } from "discord.js";
 import { handleMessage } from "./commands";
 import { rememberDeletedMessage } from "./utility";
-import { startReminderScheduler } from "./reminders";
+import { handleBumpMessage, startReminderScheduler } from "./reminders";
 import { handleEmbedInteraction } from "./embeds";
 import { handleSlashCommand, handleSocialAutocomplete, registerSlashCommands } from "./slash";
 import { handleSocialBackButton } from "./social";
@@ -68,6 +68,9 @@ export function createBot(): Client {
   });
 
   client.on("messageCreate", async (message) => {
+    void handleBumpMessage(message).catch((err) => {
+      logger.error({ err, guildId: message.guildId }, "Error handling bump message");
+    });
     if (message.mentions.everyone) {
       void handleEmergencyEveryonePing(client, message).catch((err) => {
         logger.error({ err, guildId: message.guildId, userId: message.author.id }, "Error checking emergency @everyone threshold");
