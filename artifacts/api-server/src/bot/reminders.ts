@@ -123,6 +123,37 @@ export async function handleTimerCommand(message: Message): Promise<void> {
   await saveScheduledMessage(message, "timer", duration, match?.[2]?.trim().slice(0, 1000) || "Timer finished.");
 }
 
+const DISBOARD_BOT_ID = "302050872383242240";
+const BUMP_INTERVAL_MS = 2 * 60 * 60_000;
+
+export async function handleBumpMessage(message: Message): Promise<void> {
+  if (!message.guild || message.author.id !== DISBOARD_BOT_ID) return;
+  const text = message.embeds.map((e) => e.description ?? "").join("\n");
+  if (!/bump done/i.test(text)) return;
+
+  const bumper = message.interactionMetadata?.user ?? message.interaction?.user;
+  const channelId = message.channelId;
+  await db.delete(botScheduledMessagesTable).where(and(
+    eq(botScheduledMessagesTable.guildId, message.guild.id),
+    eq(botScheduledMessagesTable.channelId, channelId),
+    eq(botScheduledMessagesTable.kind, "bump"),
+  ));
+  const dueAt = new Date(Date.now() + BUMP_INTERVAL_MS);
+  await db.insert(botScheduledMessagesTable).values({
+    guildId: message.guild.id,
+    userId: bumper?.id ?? message.author.id,
+    channelId,
+    kind: "bump",
+    content: "Time to bump the server again! Use `/bump`.",
+    dueAt,
+  });
+  if (!message.channel.isSendable()) return;
+  await message.channel.send({
+    content: `Thanks for bumping! I'll remind you <t:${Math.floor(dueAt.getTime() / 1000)}:R>.`,
+    allowedMentions: { parse: [] },
+  }).catch(() => undefined);
+}
+
 async function deliverDueMessages(client: Client): Promise<void> {
   if (schedulerRunning) return;
   schedulerRunning = true;
@@ -145,6 +176,14 @@ async function deliverDueMessages(client: Client): Promise<void> {
             ],
             allowedMentions: { parse: [] },
           });
+        } else if (scheduled.kind === "bump") {
+          const channel = await client.channels.fetch(scheduled.channelId).catch(() => null);
+          if (channel?.type === ChannelType.GuildText || channel?.type === ChannelType.GuildAnnouncement) {
+            await channel.send({
+              content: `<@${scheduled.userId}> ${scheduled.content}`,
+              allowedMentions: { users: [scheduled.userId] },
+            });
+          }
         } else {
           const channel = await client.channels.fetch(scheduled.channelId).catch(() => null);
           if (channel?.type === ChannelType.GuildText || channel?.type === ChannelType.GuildAnnouncement) {
