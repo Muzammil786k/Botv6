@@ -1,4 +1,5 @@
 import {
+  AutocompleteInteraction,
   ChatInputCommandInteraction,
   Client,
   Collection,
@@ -11,7 +12,7 @@ import {
 } from "discord.js";
 import { handleMessage } from "./commands";
 import { logger } from "../lib/logger";
-import { SOCIAL_ACTION_NAMES, SOCIAL_ACTIONS } from "./social";
+import { SOCIAL_ACTION_NAMES } from "./social";
 import { bumpStickyForChannel } from "./automation";
 import { premiumEmbed } from "./presentation";
 import { VC_HELP_TEXT } from "./joinToCreate";
@@ -564,12 +565,13 @@ const slashCommands = [
     .setDescription("Configure or open support tickets.")
     .addStringOption((o) => o.setName("args").setDescription("Ticket parameters")),
 
-  ...SOCIAL_ACTION_NAMES.map((name) =>
-    new SlashCommandBuilder()
-      .setName(name)
-      .setDescription(SOCIAL_ACTIONS[name].description)
-      .addUserOption((o) => o.setName("user").setDescription("Member to interact with").setRequired(true))
-  ),
+  // Discord allows at most 100 slash commands per guild, so all social actions
+  // (hug, kiss, ...) share one /social command with an autocompleted action.
+  new SlashCommandBuilder()
+    .setName("social")
+    .setDescription("Use a social action like hug, kiss or pat on a member.")
+    .addStringOption((o) => o.setName("action").setDescription("Social action").setRequired(true).setAutocomplete(true))
+    .addUserOption((o) => o.setName("user").setDescription("Member to interact with").setRequired(true)),
 ].map((command) => command.toJSON());
 
 function mentionContent(interaction: ChatInputCommandInteraction, optionName: string, fallback = ""): string {
@@ -774,6 +776,10 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
       const role = interaction.options.getRole("role");
       return `!quoterole set ${role ? `<@&${role.id}>` : ""}`.trim();
     }
+    case "social": {
+      const action = string("action").toLowerCase();
+      return `!${action} ${mentionContent(interaction, "user")}`.trim();
+    }
     case "ticket":
       return `!ticket ${string("args")}`.trim();
     case "autoreact":
@@ -856,6 +862,12 @@ export async function registerSlashCommands(client: Client): Promise<void> {
     }
   }
   logger.info({ commands: slashCommands.length, guilds: client.guilds.cache.size }, "Slash commands registered");
+}
+
+export async function handleSocialAutocomplete(interaction: AutocompleteInteraction): Promise<void> {
+  const typed = interaction.options.getFocused().toLowerCase();
+  const matches = SOCIAL_ACTION_NAMES.filter((name) => name.includes(typed)).slice(0, 25);
+  await interaction.respond(matches.map((name) => ({ name, value: name }))).catch(() => {});
 }
 
 export async function handleSlashCommand(client: Client, interaction: ChatInputCommandInteraction): Promise<void> {
