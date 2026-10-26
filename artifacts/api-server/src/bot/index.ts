@@ -9,7 +9,7 @@ import { handleMessage } from "./commands";
 import { rememberDeletedMessage } from "./utility";
 import { startReminderScheduler } from "./reminders";
 import { handleEmbedInteraction } from "./embeds";
-import { handleSlashCommand, registerSlashCommands } from "./slash";
+import { handleSlashCommand, handleSocialAutocomplete, registerSlashCommands } from "./slash";
 import { handleSocialBackButton } from "./social";
 import { giveaways, buildGiveawayEmbed } from "./giveaway";
 import { handleJtcInteraction, handleVoiceStateUpdate, startTempChannelCleanupScheduler } from "./joinToCreate";
@@ -185,6 +185,10 @@ export function createBot(): Client {
       } catch (err) {
         logger.error({ err, customId: interaction.customId }, "Error handling join-to-create interaction");
       }
+      return;
+    }
+    if (interaction.isAutocomplete()) {
+      if (interaction.commandName === "social") await handleSocialAutocomplete(interaction);
       return;
     }
     if (!interaction.isChatInputCommand()) return;
