@@ -278,7 +278,8 @@ const slashCommands = [
   new SlashCommandBuilder()
     .setName("setchatreward")
     .setDescription("Choose where active chat rewards are announced.")
-    .addChannelOption((o) => o.setName("channel").setDescription("Reward announcement text channel").addChannelTypes(ChannelType.GuildText).setRequired(true)),
+    .addChannelOption((o) => o.setName("channel").setDescription("Reward announcement text channel (leave empty to see current)").addChannelTypes(ChannelType.GuildText))
+    .addBooleanOption((o) => o.setName("remove").setDescription("Clear the reward channel")),
   new SlashCommandBuilder()
     .setName("wbstop")
     .setDescription("Stop the current Word Bomb game."),
@@ -392,7 +393,35 @@ const slashCommands = [
   new SlashCommandBuilder()
     .setName("shop")
     .setDescription("View or purchase roles from the role shop.")
-    .addStringOption((o) => o.setName("args").setDescription("Action or role name e.g. buy <role>")),
+    .addSubcommand((sub) => sub.setName("list").setDescription("Show roles for sale."))
+    .addSubcommand((sub) =>
+      sub.setName("buy").setDescription("Buy a role with credits.")
+        .addRoleOption((o) => o.setName("role").setDescription("Role to buy").setRequired(true)),
+    )
+    .addSubcommand((sub) =>
+      sub.setName("add").setDescription("Add a role to the shop (Manage Server).")
+        .addRoleOption((o) => o.setName("role").setDescription("Role to sell").setRequired(true))
+        .addIntegerOption((o) => o.setName("price").setDescription("Price in credits").setMinValue(1).setRequired(true)),
+    )
+    .addSubcommand((sub) =>
+      sub.setName("edit").setDescription("Change a shop role's price (Manage Server).")
+        .addRoleOption((o) => o.setName("role").setDescription("Shop role").setRequired(true))
+        .addIntegerOption((o) => o.setName("price").setDescription("New price in credits").setMinValue(1).setRequired(true)),
+    )
+    .addSubcommand((sub) =>
+      sub.setName("remove").setDescription("Remove a role from the shop (Manage Server).")
+        .addRoleOption((o) => o.setName("role").setDescription("Shop role").setRequired(true)),
+    ),
+  new SlashCommandBuilder()
+    .setName("addcredits")
+    .setDescription("Give credits to a member (Manage Server).")
+    .addUserOption((o) => o.setName("user").setDescription("Member").setRequired(true))
+    .addIntegerOption((o) => o.setName("amount").setDescription("Credits to add").setMinValue(1).setRequired(true)),
+  new SlashCommandBuilder()
+    .setName("removecredits")
+    .setDescription("Take credits from a member (Manage Server).")
+    .addUserOption((o) => o.setName("user").setDescription("Member").setRequired(true))
+    .addIntegerOption((o) => o.setName("amount").setDescription("Credits to remove").setMinValue(1).setRequired(true)),
 
   new SlashCommandBuilder()
     .setName("steal")
@@ -660,6 +689,7 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
       return channel ? `!setgame <#${channel.id}>` : "!setgame status";
     }
     case "setchatreward": {
+      if (interaction.options.getBoolean("remove")) return "!setchatreward remove";
       const channel = interaction.options.getChannel("channel");
       return channel ? `!setchatreward <#${channel.id}>` : "!setchatreward status";
     }
@@ -716,8 +746,19 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
       return `!credit ${mentionContent(interaction, "user")}`.trim();
     case "topcredits":
       return "!top credits";
-    case "shop":
-      return `!shop ${string("args")}`.trim();
+    case "shop": {
+      const sub = interaction.options.getSubcommand(false) ?? "list";
+      const role = interaction.options.getRole("role");
+      const price = integer("price");
+      const roleText = role ? `<@&${role.id}>` : "";
+      if (sub === "list") return "!shop list";
+      if (sub === "add" || sub === "edit") return `!shop ${sub} ${roleText} ${price ?? ""}`.trim();
+      return `!shop ${sub} ${roleText}`.trim();
+    }
+    case "addcredits":
+      return `!credits add ${mentionContent(interaction, "user")} ${integer("amount") ?? ""}`.trim();
+    case "removecredits":
+      return `!credits remove ${mentionContent(interaction, "user")} ${integer("amount") ?? ""}`.trim();
     case "steal":
       return `!steal ${string("source")} ${string("name")}`.trim();
     case "embed":
