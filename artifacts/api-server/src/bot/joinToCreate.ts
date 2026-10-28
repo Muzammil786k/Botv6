@@ -176,8 +176,8 @@ async function transferOwnership(
   await channel.permissionOverwrites.edit(newOwnerId, {
     ViewChannel: true,
     Connect: true,
-    ManageChannels: true,
-    MoveMembers: true,
+    ManageChannels: null,
+    MoveMembers: null,
   });
   if (oldOwnerId !== newOwnerId) {
     await channel.permissionOverwrites.edit(oldOwnerId, {
@@ -253,31 +253,29 @@ async function createTempChannel(
   try {
     const categoryId = config.categoryId || lobby.parentId || undefined;
 
-    created = await newState.guild.channels.create({
-      name: `${member.displayName}'s Channel`,
-      type: ChannelType.GuildVoice,
-      parent: categoryId,
-      permissionOverwrites: [
-        {
-          id: newState.guild.roles.everyone.id,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.Connect,
-            PermissionFlagsBits.Speak,
-          ],
-        },
-        {
-          id: member.id,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.Connect,
-            PermissionFlagsBits.Speak,
-            PermissionFlagsBits.ManageChannels,
-            PermissionFlagsBits.MoveMembers,
-          ],
-        },
+created = await newState.guild.channels.create({
+  name: `${member.displayName}'s Channel`,
+  type: ChannelType.GuildVoice,
+  parent: categoryId,
+  permissionOverwrites: [
+    {
+      id: newState.guild.roles.everyone.id,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
       ],
-    });
+    },
+    {
+      id: member.id,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+      ],
+    },
+  ],
+});
     await persistTempChannel(created.id, newState.guild.id, member.id);
 
     // The member may have left the lobby while the channel was being created.
