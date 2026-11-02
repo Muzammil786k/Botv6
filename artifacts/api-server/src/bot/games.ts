@@ -9,7 +9,7 @@ import {
   type TextChannel,
 } from "discord.js";
 import { and, eq } from "drizzle-orm";
-import { botGameSettingsTable, db } from "@workspace/db";
+import { botScheduledGameSettingsTable, db } from "@workspace/db";
 import { premiumColors, premiumMessagePayload } from "./presentation";
 import { awardGameCredits } from "./credits";
 
@@ -342,9 +342,9 @@ export async function handleCreditGameCommand(message: Message, args: string[]):
     return;
   }
   const action = args[1]?.toLowerCase() ?? "status";
-  const settings = async () => db.select().from(botGameSettingsTable).where(and(
-    eq(botGameSettingsTable.guildId, guild.id),
-    eq(botGameSettingsTable.gameType, gameType),
+  const settings = async () => db.select().from(botScheduledGameSettingsTable).where(and(
+    eq(botScheduledGameSettingsTable.guildId, guild.id),
+    eq(botScheduledGameSettingsTable.gameType, gameType),
   )).limit(1);
 
   if (action === "setup" || action === "set") {
@@ -358,10 +358,10 @@ export async function handleCreditGameCommand(message: Message, args: string[]):
       return;
     }
     const now = Date.now();
-    await db.insert(botGameSettingsTable)
+    await db.insert(botScheduledGameSettingsTable)
       .values({ guildId: guild.id, gameType, channelId: channel.id, intervalMinutes, reward, enabled: true, nextGameAt: now + intervalMinutes * 60_000 })
       .onConflictDoUpdate({
-        target: [botGameSettingsTable.guildId, botGameSettingsTable.gameType],
+        target: [botScheduledGameSettingsTable.guildId, botScheduledGameSettingsTable.gameType],
         set: { channelId: channel.id, intervalMinutes, reward, enabled: true, nextGameAt: now + intervalMinutes * 60_000, updatedAt: new Date(now) },
       });
     await message.reply(`<:tick:1563231751432704131> **${gameLabel(gameType)}** enabled in ${channel}, every ${intervalMinutes} minutes, reward **${reward} credits**.`);
@@ -388,7 +388,7 @@ export async function handleCreditGameCommand(message: Message, args: string[]):
       await message.reply(`Usage: \`!games ${gameType} interval 30m\` (allowed: 1m–24h).`);
       return;
     }
-    await db.update(botGameSettingsTable).set({ intervalMinutes, nextGameAt: now + intervalMinutes * 60_000, updatedAt: new Date(now) }).where(and(eq(botGameSettingsTable.guildId, guild.id), eq(botGameSettingsTable.gameType, gameType)));
+    await db.update(botScheduledGameSettingsTable).set({ intervalMinutes, nextGameAt: now + intervalMinutes * 60_000, updatedAt: new Date(now) }).where(and(eq(botScheduledGameSettingsTable.guildId, guild.id), eq(botScheduledGameSettingsTable.gameType, gameType)));
     await message.reply(`<:tick:1563231751432704131> **${gameLabel(gameType)}** interval set to **${intervalMinutes} minutes**.`);
     return;
   }
@@ -398,18 +398,18 @@ export async function handleCreditGameCommand(message: Message, args: string[]):
       await message.reply(`Usage: \`!games ${gameType} reward <amount>\` (1–${MAX_REWARD.toLocaleString()}).`);
       return;
     }
-    await db.update(botGameSettingsTable).set({ reward, updatedAt: new Date(now) }).where(and(eq(botGameSettingsTable.guildId, guild.id), eq(botGameSettingsTable.gameType, gameType)));
+    await db.update(botScheduledGameSettingsTable).set({ reward, updatedAt: new Date(now) }).where(and(eq(botScheduledGameSettingsTable.guildId, guild.id), eq(botScheduledGameSettingsTable.gameType, gameType)));
     await message.reply(`<:tick:1563231751432704131> **${gameLabel(gameType)}** reward set to **${reward} credits**.`);
     return;
   }
   if (action === "pause" || action === "resume") {
     const enabled = action === "resume";
-    await db.update(botGameSettingsTable).set({ enabled, nextGameAt: enabled ? now + setting.intervalMinutes * 60_000 : setting.nextGameAt, updatedAt: new Date(now) }).where(and(eq(botGameSettingsTable.guildId, guild.id), eq(botGameSettingsTable.gameType, gameType)));
+    await db.update(botScheduledGameSettingsTable).set({ enabled, nextGameAt: enabled ? now + setting.intervalMinutes * 60_000 : setting.nextGameAt, updatedAt: new Date(now) }).where(and(eq(botScheduledGameSettingsTable.guildId, guild.id), eq(botScheduledGameSettingsTable.gameType, gameType)));
     await message.reply(`<:tick:1563231751432704131> Automatic **${gameLabel(gameType)}** ${enabled ? "resumed" : "paused"}.`);
     return;
   }
   if (action === "remove" || action === "off") {
-    await db.delete(botGameSettingsTable).where(and(eq(botGameSettingsTable.guildId, guild.id), eq(botGameSettingsTable.gameType, gameType)));
+    await db.delete(botScheduledGameSettingsTable).where(and(eq(botScheduledGameSettingsTable.guildId, guild.id), eq(botScheduledGameSettingsTable.gameType, gameType)));
     await message.reply(`<:tick:1563231751432704131> Automatic **${gameLabel(gameType)}** removed.`);
     return;
   }
@@ -424,18 +424,18 @@ export function startGamesScheduler(client: import("discord.js").Client): void {
     schedulerRunning = true;
     try {
       const now = Date.now();
-      const settings = await db.select().from(botGameSettingsTable).where(and(eq(botGameSettingsTable.enabled, true)));
+      const settings = await db.select().from(botScheduledGameSettingsTable).where(and(eq(botScheduledGameSettingsTable.enabled, true)));
       for (const setting of settings) {
         if (setting.nextGameAt > now || rounds.has(roundKey(setting.guildId, setting.channelId))) continue;
-        const [reserved] = await db.update(botGameSettingsTable)
+        const [reserved] = await db.update(botScheduledGameSettingsTable)
           .set({ nextGameAt: now + setting.intervalMinutes * 60_000, updatedAt: new Date(now) })
           .where(and(
-            eq(botGameSettingsTable.guildId, setting.guildId),
-            eq(botGameSettingsTable.gameType, setting.gameType),
-            eq(botGameSettingsTable.enabled, true),
-            eq(botGameSettingsTable.nextGameAt, setting.nextGameAt),
+            eq(botScheduledGameSettingsTable.guildId, setting.guildId),
+            eq(botScheduledGameSettingsTable.gameType, setting.gameType),
+            eq(botScheduledGameSettingsTable.enabled, true),
+            eq(botScheduledGameSettingsTable.nextGameAt, setting.nextGameAt),
           ))
-          .returning({ guildId: botGameSettingsTable.guildId });
+          .returning({ guildId: botScheduledGameSettingsTable.guildId });
         if (!reserved) continue;
         const channel = await client.channels.fetch(setting.channelId).catch(() => null);
         const gameType = parseGameType(setting.gameType);

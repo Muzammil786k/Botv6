@@ -1,10 +1,9 @@
 import { ChannelType, PermissionFlagsBits, type Message, type TextChannel } from "discord.js";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { botGameSettingsTable, db } from "@workspace/db";
 import { logger } from "../lib/logger";
 
 const CONFIG_CACHE_MS = 15_000;
-const LEGACY_GAME_TYPE = "legacy";
 const gameChannelCache = new Map<string, { expiresAt: number; channelId: string | null }>();
 
 async function getGameChannelId(guildId: string): Promise<string | null | undefined> {
@@ -15,10 +14,7 @@ async function getGameChannelId(guildId: string): Promise<string | null | undefi
     const [settings] = await db
       .select({ channelId: botGameSettingsTable.channelId })
       .from(botGameSettingsTable)
-      .where(and(
-        eq(botGameSettingsTable.guildId, guildId),
-        eq(botGameSettingsTable.gameType, LEGACY_GAME_TYPE),
-      ))
+      .where(eq(botGameSettingsTable.guildId, guildId))
       .limit(1);
     const channelId = settings?.channelId ?? null;
     gameChannelCache.set(guildId, { expiresAt: Date.now() + CONFIG_CACHE_MS, channelId });
@@ -62,10 +58,7 @@ export async function handleSetGameCommand(message: Message, args: string[]): Pr
   const action = args[0]?.toLowerCase();
   if (action === "remove" || action === "clear" || action === "off") {
     try {
-      await db.delete(botGameSettingsTable).where(and(
-        eq(botGameSettingsTable.guildId, guild.id),
-        eq(botGameSettingsTable.gameType, LEGACY_GAME_TYPE),
-      ));
+      await db.delete(botGameSettingsTable).where(eq(botGameSettingsTable.guildId, guild.id));
       gameChannelCache.set(guild.id, { expiresAt: Date.now() + CONFIG_CACHE_MS, channelId: null });
       await message.reply("✅ The game channel was cleared. Games are now disabled until another channel is set.");
     } catch (err) {
@@ -99,13 +92,13 @@ export async function handleSetGameCommand(message: Message, args: string[]): Pr
 
   try {
     await db.insert(botGameSettingsTable)
-      .values({ guildId: guild.id, gameType: LEGACY_GAME_TYPE, channelId: channel.id })
+      .values({ guildId: guild.id, channelId: channel.id })
       .onConflictDoUpdate({
-        target: [botGameSettingsTable.guildId, botGameSettingsTable.gameType],
+        target: botGameSettingsTable.guildId,
         set: { channelId: channel.id, updatedAt: new Date() },
       });
     gameChannelCache.set(guild.id, { expiresAt: Date.now() + CONFIG_CACHE_MS, channelId: channel.id });
-    await message.reply(`✅ Word Bomb, Truth or Dare, and credit games are now restricted to ${channel as TextChannel}.`);
+    await message.reply(`✅ Word Bomb and Truth or Dare are now restricted to ${channel as TextChannel}.`);
   } catch (err) {
     logger.error({ err, guildId: guild.id, channelId }, "Failed to set game channel");
     await message.reply("❌ Could not save the game channel. Please try again.");

@@ -24,6 +24,7 @@ export * from "./bot-social-roles";
 export * from "./bot-moderation-roles";
 export * from "./bot-moderation-action-limits";
 export * from "./bot-game-settings";
+export * from "./bot-scheduled-game-settings";
 export * from "./bot-jtc-temp-channels";
 export * from "./bot-quote-settings";
 export * from "./bot-experience";
