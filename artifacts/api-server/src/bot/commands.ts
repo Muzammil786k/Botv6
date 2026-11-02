@@ -51,11 +51,11 @@ import { handleModerationLimitCommand } from "./moderationLimits";
 import { handleSetGameCommand } from "./gameChannel";
 import { handleTruthOrDare } from "./truthordare";
 import { handleQuoteRoleCommand, handleSetQuoteCommand } from "./quoteChannel";
-import { handleCreditCommand, handleCreditLeaderboardCommand, handleRoleShopCommand } from "./roleShop";
+import { handleCreditCommand, handleCreditLeaderboardCommand, handleCreditTransferCommand, handleRoleShopCommand } from "./roleShop";
 import { awardChatCredits, handleActiveChatRewardChannelCommand } from "./credits";
+import { handleCreditGameAnswer, handleCreditGameCommand } from "./games";
 import { handleCreditDropCommand } from "./crates";
 import { handleFlagDropAnswer, handleFlagDropCommand } from "./flagDrop";
-import { handleCreditAirdropCommand } from "./creditAirdrop";
 import { handleEmbedCommand } from "./embeds";
 import { handleStatusRoleCommand } from "./statusRole";
 import { handleGuildTagRoleCommand } from "./guildTagRole";
@@ -87,6 +87,7 @@ export async function handleMessage(
 
   if (!raw.startsWith("!")) {
     await handleFlagDropAnswer(message);
+    await handleCreditGameAnswer(message);
   }
 
   if (!content.startsWith("!") && !noPrefix) return;
@@ -105,12 +106,12 @@ export async function handleMessage(
     await handleActiveChatRewardChannelCommand(message, content.split(/\s+/).slice(1));
     return;
   }
-  if (lower === "!airdrop" || lower.startsWith("!airdrop ")) {
-    await handleCreditAirdropCommand(message, content.split(/\s+/).slice(1));
-    return;
-  }
   if (lower === "!embed" || lower.startsWith("!embed ")) {
     await handleEmbedCommand(message);
+    return;
+  }
+  if (lower === "!games" || lower.startsWith("!games ")) {
+    await handleCreditGameCommand(message, content.split(/\s+/).slice(1));
     return;
   }
 
@@ -240,6 +241,8 @@ export async function handleMessage(
     await handleWbTop(message);
   } else if (lower === "!top credits" || lower === "!top credit" || lower === "!topcredits") {
     await handleCreditLeaderboardCommand(message);
+  } else if (lower === "!transfer" || lower.startsWith("!transfer ") || lower === "!give" || lower.startsWith("!give ")) {
+    await handleCreditTransferCommand(message);
   } else if (lower === "!credit" || lower.startsWith("!credit ") || lower === "!credits" || lower.startsWith("!credits ")) {
     await handleCreditCommand(message);
   } else if (lower === "!shop" || lower.startsWith("!shop ")) {

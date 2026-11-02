@@ -10,7 +10,7 @@ import {
   type Message,
   type Role,
 } from "discord.js";
-import { and, asc, desc, eq, gt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray } from "drizzle-orm";
 import { db, botMiningProfilesTable, botRoleShopTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 
@@ -146,13 +146,93 @@ export async function handleCreditCommand(message: Message): Promise<void> {
       .limit(1);
     const credits = profile?.credits ?? 0;
     await message.reply({
-      content: `<@${message.author.id}> | <:16:1553581538074038372> You have **${credits.toLocaleString()} credits**`,
-      suppressHelpFooter: true,
+      embeds: [new EmbedBuilder()
+        .setColor(EMBED_COLOR)
+        .setDescription(`<@${message.author.id}> | <:16:1553581538074038372> You have **${credits.toLocaleString()} credits**`)
+        .setFooter({ text: "Use !shop to spend your credits on server roles." })],
       allowedMentions: { users: [] },
     });
   } catch (error) {
     logger.error({ err: error, guildId: guild.id, userId: message.author.id }, "Could not load user credits");
     await message.reply(replyEmbed("Credits unavailable", "I couldn't load your credit balance. Please try again."));
+  }
+}
+
+export async function handleCreditTransferCommand(message: Message): Promise<void> {
+  const guild = message.guild;
+  if (!guild) return;
+
+  const targetUser = message.mentions.users.first();
+  const amountArgument = message.content.trim().split(/\s+/).find((value) => /^\d+$/.test(value));
+  const amount = amountArgument ? Number(amountArgument) : NaN;
+  if (!targetUser || targetUser.bot || !Number.isSafeInteger(amount) || amount < 1 || amount > MAX_CREDIT_BALANCE) {
+    await message.reply({
+      content: `Usage: \`!transfer @user <amount>\` (amount: 1–${MAX_CREDIT_BALANCE.toLocaleString()}).`,
+      allowedMentions: { parse: [], repliedUser: false },
+    });
+    return;
+  }
+  if (targetUser.id === message.author.id) {
+    await message.reply({ content: "You cannot transfer credits to yourself.", allowedMentions: { parse: [], repliedUser: false } });
+    return;
+  }
+
+  const target = await guild.members.fetch(targetUser.id).catch(() => null);
+  if (!target) {
+    await message.reply({ content: "That user is not a member of this server.", allowedMentions: { parse: [], repliedUser: false } });
+    return;
+  }
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      await tx.insert(botMiningProfilesTable)
+        .values([
+          { guildId: guild.id, userId: message.author.id },
+          { guildId: guild.id, userId: target.id },
+        ])
+        .onConflictDoNothing();
+      const profiles = await tx.select()
+        .from(botMiningProfilesTable)
+        .where(and(
+          eq(botMiningProfilesTable.guildId, guild.id),
+          inArray(botMiningProfilesTable.userId, [message.author.id, target.id]),
+        ))
+        .orderBy(asc(botMiningProfilesTable.userId))
+        .for("update");
+      const sender = profiles.find((profile) => profile.userId === message.author.id);
+      const recipient = profiles.find((profile) => profile.userId === target.id);
+      if (!sender || !recipient) throw new Error("Could not load credit profiles");
+      if (sender.coins < amount) return { status: "insufficient" as const, balance: sender.coins };
+      if (recipient.coins + amount > MAX_CREDIT_BALANCE) return { status: "maximum" as const };
+
+      await tx.update(botMiningProfilesTable)
+        .set({ coins: sender.coins - amount, updatedAt: new Date() })
+        .where(and(eq(botMiningProfilesTable.guildId, guild.id), eq(botMiningProfilesTable.userId, sender.userId)));
+      await tx.update(botMiningProfilesTable)
+        .set({ coins: recipient.coins + amount, updatedAt: new Date() })
+        .where(and(eq(botMiningProfilesTable.guildId, guild.id), eq(botMiningProfilesTable.userId, recipient.userId)));
+      return { status: "transferred" as const, balance: sender.coins - amount };
+    });
+
+    if (result.status === "insufficient") {
+      await message.reply({
+        content: `You only have **${result.balance.toLocaleString()} credits**; you cannot transfer ${amount.toLocaleString()}.`,
+        allowedMentions: { parse: [], repliedUser: false },
+      });
+      return;
+    }
+    if (result.status === "maximum") {
+      await message.reply({ content: "That transfer would exceed the recipient's maximum credit balance.", allowedMentions: { parse: [], repliedUser: false } });
+      return;
+    }
+
+    await message.reply({
+      content: `✅ Transferred **${amount.toLocaleString()} credits** to <@${target.id}>. Your new balance: **${result.balance.toLocaleString()} credits**.`,
+      allowedMentions: { users: [target.id] },
+    });
+  } catch (error) {
+    logger.error({ err: error, guildId: guild.id, userId: message.author.id, targetUserId: target.id }, "Could not transfer credits");
+    await message.reply({ content: "Could not transfer credits right now. Please try again.", allowedMentions: { parse: [], repliedUser: false } });
   }
 }
 

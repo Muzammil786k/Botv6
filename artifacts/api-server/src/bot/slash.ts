@@ -223,6 +223,7 @@ const slashCommands = [
         .setName("set")
         .setDescription("Set or replace the sticky message.")
         .addChannelOption((o) => o.setName("channel").setDescription("Text channel").addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setRequired(true))
+        .addStringOption((o) => o.setName("mode").setDescription("Send as an embed or plain message").addChoices({ name: "Embed", value: "embed" }, { name: "Plain message", value: "plain" }))
         .addStringOption((o) => o.setName("message").setDescription("Sticky text").setMaxLength(1500).setRequired(true)),
     )
     .addSubcommand((sub) =>
@@ -268,6 +269,21 @@ const slashCommands = [
     .setName("wordbomb")
     .setDescription("Start a Word Bomb game in the configured games channel."),
   new SlashCommandBuilder()
+    .setName("games")
+    .setDescription("Play a credit-reward knowledge or word game.")
+    .addStringOption((option) => option
+      .setName("type")
+      .setDescription("Choose a game")
+      .setRequired(true)
+      .addChoices(
+        { name: "Country Capitals", value: "capital" },
+        { name: "Celebrity Identify", value: "celebrity" },
+        { name: "Letter + Theme", value: "letter" },
+        { name: "Trivia Quiz", value: "trivia" },
+        { name: "Math Challenge", value: "math" },
+        { name: "Guess the Number", value: "number" },
+      )),
+  new SlashCommandBuilder()
     .setName("truthordare")
     .setDescription("Play Truth or Dare in the configured games channel.")
     .addUserOption((o) => o.setName("user").setDescription("Player who chooses Truth or Dare")),
@@ -286,16 +302,6 @@ const slashCommands = [
     .setName("wbtop")
     .setDescription("Show the Word Bomb leaderboard."),
   new SlashCommandBuilder()
-    .setName("airdrop")
-    .setDescription("Create a timed credit airdrop for server members.")
-    .addSubcommand((sub) =>
-      sub
-        .setName("create")
-        .setDescription("Start an airdrop; entrants split the credits equally.")
-        .addIntegerOption((option) => option.setName("credits").setDescription("Total credits in the airdrop").setMinValue(1).setRequired(true))
-        .addStringOption((option) => option.setName("duration").setDescription("How long it stays open, e.g. 10m or 1h").setMaxLength(8).setRequired(true)),
-    ),
-  new SlashCommandBuilder()
     .setName("ship")
     .setDescription("Get a playful compatibility score for two members.")
     .addUserOption((o) => o.setName("user1").setDescription("First member").setRequired(true))
@@ -310,7 +316,7 @@ const slashCommands = [
         .setName("setup")
         .setDescription("Setup credit drop channel and optional interval.")
         .addChannelOption((o) => o.setName("channel").setDescription("Text channel").addChannelTypes(ChannelType.GuildText).setRequired(true))
-        .addStringOption((o) => o.setName("interval").setDescription("Interval e.g. 30m or 1h")),
+        .addStringOption((o) => o.setName("interval").setDescription("Interval e.g. 15m or 1h")),
     )
     .addSubcommand((sub) =>
       sub
@@ -562,8 +568,8 @@ const slashCommands = [
 
   new SlashCommandBuilder()
     .setName("ticket")
-    .setDescription("Configure or open support tickets.")
-    .addStringOption((o) => o.setName("args").setDescription("Ticket parameters")),
+    .setDescription("Configure tickets or post the support ticket panel.")
+    .addStringOption((o) => o.setName("args").setDescription("setup #category, panel, close, or status")),
 
   // Discord allows at most 100 slash commands per guild, so all social actions
   // (hug, kiss, ...) share one /social command with an autocompleted action.
@@ -590,8 +596,9 @@ function automationCommandContent(
     interaction.options.getString("emoji") ??
     interaction.options.getString("message") ??
     "";
+  const mode = command === "sticky" ? interaction.options.getString("mode") : null;
   const trigger = command === "autoreact" ? interaction.options.getString("trigger") ?? "" : "";
-  return `!${command} ${action} ${channelText} ${value} ${trigger}`.trim();
+  return `!${command} ${action} ${channelText}${mode ? ` ${mode}` : ""} ${value} ${trigger}`.trim();
 }
 
 function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
@@ -665,8 +672,8 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
     }
     case "truthordare":
       return `!truthordare ${mentionContent(interaction, "user")}`.trim();
-    case "airdrop":
-      return `!airdrop ${interaction.options.getInteger("credits")} ${string("duration")}`;
+    case "games":
+      return `!games ${string("type")}`;
     case "voice":
       return `!voice ${interaction.options.getSubcommand(false) ?? "help"}`;
     case "ship":

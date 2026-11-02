@@ -275,7 +275,7 @@ export async function handleStickyCommand(
   if (!channel) {
     await message.reply({
       content:
-        "❌ Mention a text channel. Usage: `!sticky set #channel <message>` or `!sticky remove #channel`.",
+        "❌ Mention a text channel. Usage: `!sticky set #channel <embed|plain> <message>` or `!sticky remove #channel`.",
       allowedMentions: { parse: [], repliedUser: false },
     });
     return;
@@ -286,7 +286,7 @@ export async function handleStickyCommand(
       const settings = await getChannelAutomationSettings(message.guild.id, channel.id);
       await message.reply({
         content: settings?.stickyContent
-          ? `📌 Sticky message is on in ${channel}. Current message: ${settings.stickyContent}`
+          ? `📌 Sticky message is on in ${channel} (${settings.stickyUseEmbed ? "embed" : "plain"}). Current message: ${settings.stickyContent}`
           : `ℹ️ No sticky message is configured in ${channel}.`,
         allowedMentions: { parse: [], repliedUser: false },
       });
@@ -297,7 +297,10 @@ export async function handleStickyCommand(
   }
 
   if (action === "set") {
-    const content = textAfterChannelMention(message, channel);
+    const rawContent = textAfterChannelMention(message, channel);
+    const modeMatch = /^(embed|plain)\s+([\s\S]+)$/i.exec(rawContent);
+    const useEmbed = modeMatch ? modeMatch[1]!.toLowerCase() === "embed" : true;
+    const content = modeMatch ? modeMatch[2]!.trim() : rawContent;
     if (!content || content.length > automationLimits.maxStickyContentLength) {
       await message.reply({
         content: `❌ Sticky text must be between 1 and ${automationLimits.maxStickyContentLength} characters.`,
@@ -318,17 +321,17 @@ export async function handleStickyCommand(
     if (
       !permissions?.has(PermissionFlagsBits.ViewChannel) ||
       !permissions.has(sendPermission) ||
-      !permissions.has(PermissionFlagsBits.EmbedLinks)
+      (useEmbed && !permissions.has(PermissionFlagsBits.EmbedLinks))
     ) {
       await message.reply({
-        content: `❌ I need **View Channel**, **${isThread ? "Send Messages in Threads" : "Send Messages"}**, and **Embed Links** permissions in ${channel} to keep a sticky message there.`,
+        content: `❌ I need **View Channel** and **${isThread ? "Send Messages in Threads" : "Send Messages"}**${useEmbed ? ", plus **Embed Links**" : ""} permissions in ${channel} to keep a sticky message there.`,
         allowedMentions: { parse: [], repliedUser: false },
       });
       return;
     }
 
     try {
-      await setChannelSticky(message.guild.id, channel.id, content);
+      await setChannelSticky(message.guild.id, channel.id, content, useEmbed);
       await message.reply({
         content: `✅ Sticky message set for ${channel}. It will be moved to the bottom after each new message.`,
         allowedMentions: { parse: [], repliedUser: false },
@@ -369,7 +372,7 @@ export async function handleStickyCommand(
   }
 
   await message.reply({
-    content: "ℹ️ Usage: `!sticky set #channel <message>` or `!sticky remove #channel`.",
+    content: "ℹ️ Usage: `!sticky set #channel <embed|plain> <message>` or `!sticky remove #channel`.",
     allowedMentions: { parse: [], repliedUser: false },
   });
 }

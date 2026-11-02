@@ -172,13 +172,14 @@ export async function setChannelSticky(
   guildId: string,
   channelId: string,
   content: string,
+  useEmbed = true,
 ): Promise<void> {
   await db
     .insert(botChannelAutomationsTable)
-    .values({ guildId, channelId, stickyContent: content })
+    .values({ guildId, channelId, stickyContent: content, stickyUseEmbed: useEmbed })
     .onConflictDoUpdate({
       target: [botChannelAutomationsTable.guildId, botChannelAutomationsTable.channelId],
-      set: { stickyContent: content, updatedAt: new Date() },
+      set: { stickyContent: content, stickyUseEmbed: useEmbed, updatedAt: new Date() },
     });
   invalidateChannelSettings(guildId, channelId);
 }
@@ -319,16 +320,18 @@ async function bumpStickyMessage(
     }
   }
 
-  const sent = await channel.send({
-    embeds: [
-      premiumEmbed(
-        settings.stickyContent,
-        { title: "📌 Sticky message", color: premiumColors.brand },
-        client.user,
-      ),
-    ],
-    allowedMentions: { parse: [] },
-  });
+  const sent = await channel.send(settings.stickyUseEmbed
+    ? {
+        embeds: [new EmbedBuilder()
+          .setColor(premiumColors.brand)
+          .setDescription(settings.stickyContent)
+          .setFooter(null)],
+        allowedMentions: { parse: [] },
+      }
+    : {
+        content: settings.stickyContent,
+        allowedMentions: { parse: [] },
+      });
 
   await db
     .update(botChannelAutomationsTable)

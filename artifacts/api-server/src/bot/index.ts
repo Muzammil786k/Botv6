@@ -18,7 +18,6 @@ import { logger } from "../lib/logger";
 import { processUserMessageAutomations, sendMemberMessage } from "./automation";
 import { handleCreditDropReaction, startCreditDropScheduler } from "./crates";
 import { startFlagDropScheduler } from "./flagDrop";
-import { handleCreditAirdropButton, startCreditAirdropScheduler } from "./creditAirdrop";
 import { handleStatusRolePresenceUpdate } from "./statusRole";
 import { handleGuildTagRoleUserUpdate } from "./guildTagRole";
 import { handleTruthOrDareModal } from "./truthordare";
@@ -55,7 +54,6 @@ export function createBot(): Client {
     client.user?.setActivity("🎉 Giveaways | !help | /help");
     startCreditDropScheduler(client);
     startFlagDropScheduler(client);
-    startCreditAirdropScheduler(client);
     startTempChannelCleanupScheduler(client);
     startReminderScheduler(client);
     void registerSlashCommands(client);
@@ -167,15 +165,7 @@ export function createBot(): Client {
       await handleSocialBackButton(interaction);
       return;
     }
-    if (interaction.isButton() && interaction.customId.startsWith("creditairdrop:join:")) {
-      try {
-        await handleCreditAirdropButton(interaction);
-      } catch (err) {
-        logger.error({ err, customId: interaction.customId }, "Error handling credit airdrop entry");
-      }
-      return;
-    }
-    if (interaction.isButton() && interaction.customId.startsWith("ticket:close:")) {
+    if (interaction.isButton() && (interaction.customId === "ticket:open" || interaction.customId.startsWith("ticket:close:"))) {
       await handleTicketInteraction(interaction);
       return;
     }

@@ -11,7 +11,7 @@ import { premiumColors, premiumEmbed } from "./presentation";
 
 const C = premiumColors.brand;
 const TIMEOUT = 5 * 60_000;
-const HELP_FOOTER = "Choose a category or browse with Previous/Next";
+const HELP_FOOTER = "Choose a category • Browse with Previous/Next • Prefix ! or Slash /";
 const CATEGORIES = [
   { label: "🏠 Bot Overview", value: "home", description: "Main bot modules and quick start" },
   { label: "🧭 Start & Giveaways", value: "start", description: "Help and giveaway commands" },
@@ -19,8 +19,8 @@ const CATEGORIES = [
   { label: "⚙️ Server Controls", value: "controls", description: "Roles, channels, and announcements" },
   { label: "📡 Automation", value: "automation", description: "Auto-reactions, sticky, and welcome" },
   { label: "🧰 Server & Utility", value: "utility", description: "Server info, members, and bot tools" },
-  { label: "🎮 Games", value: "games", description: "Word Bomb and game commands" },
-  { label: "💰 Economy", value: "economy", description: "Browse and buy server roles" },
+  { label: "🎮 Games", value: "games", description: "Games, quizzes, and credit rewards" },
+  { label: "💰 Economy", value: "economy", description: "Credits, drops, and role shop" },
   { label: "💛 Social: Friendly", value: "friendly", description: "Hugs, cheers, compliments, and more" },
   { label: "💞 Social: Affection", value: "affection", description: "Cute and affectionate reactions" },
   { label: "✨ Social: Reactions", value: "reactions", description: "Anime reactions and playful actions" },
@@ -128,7 +128,7 @@ function page3(): EmbedBuilder {
       { name: "`!voice help` • `!v help` • `/voice help`", value: "Manage your Join to Create channel: `info` `bump` `lock` `unlock` `name <name>` `size <n>` `bitrate <kbps>` `permit|unpermit @user` `kick|ban|unban @user` `unbanall` `reset` `claim` `transfer @user`. `!vc` remains an alias. Channel controls are owner-only; `info`, `claim`, and help are available to everyone." },
       { name: "`!jtc set #lobby [#category]` • `/jtc set`", value: "Choose the Join to Create lobby voice channel and optional category.\n*(Manage Server)*" },
       { name: "`!jtc remove|disable` • `!jtc status` • `/jtc`", value: "Turn off Join to Create, or show the configured lobby and category.\n*(Manage Server)*" },
-      { name: "`!ticket help` • `!ticket new|open`", value: "Show ticket help or open a private support ticket." },
+      { name: "`!ticket panel` • `!ticket new|open`", value: "Post a Support Tickets panel. Members click **Open Ticket** to create a private support channel." },
       { name: "`!ticket close [reason]`", value: "Close your ticket; staff can close any ticket." },
       { name: "`!ticket setup|set|config #category` • `!ticket status`", value: "Configure or inspect the ticket category.\n*(Manage Server for setup)*" },
     )
@@ -179,7 +179,7 @@ function pageAutomation(): EmbedBuilder {
       { name: "`!guildtagrole remove`", value: "Disable guild-tag role automation. *(Manage Server)*" },
         { name: "`!auto emergency enable|disable|status`", value: "Monitor per-actor thresholds of 40 bans, 40 kicks, or 40 @everyone/@here pings within 10 minutes. On threshold, remove the executor's assignable roles and save permission snapshots. Configure with Manage Server; only the server owner can restore with `!auto emergency restore`. Requires View Audit Log and Manage Roles. Undefined unusual activity is not monitored." },
         { name: "`!auto emergency restore`", value: "Owner-only: restore quarantined member roles and role permissions saved during emergency mode." },
-      { name: "`!sticky set #channel <message>` • `/sticky set`", value: "Keep one branded message at the bottom of a channel. It moves after new messages." },
+      { name: "`!sticky set #channel <embed|plain> <message>` • `/sticky set`", value: "Keep one message at the bottom of a channel. Choose an embed or plain message; it moves after new messages." },
       { name: "`!sticky status #channel`", value: "Check whether a sticky message is configured in a channel." },
       { name: "`!sticky remove #channel` • `/sticky remove`", value: "Remove the sticky message and stop reposting it." },
       { name: "`!welcome test` • `!boost test`", value: "Send the configured welcome or boost message to its channel using you as the member." },
@@ -192,7 +192,8 @@ function pageAutomation(): EmbedBuilder {
 }
 
 function page5(): EmbedBuilder {
-  return helpPage("🎮 Games")
+  return helpPage("🎮 Games & Rewards")
+    .setDescription("Play in the configured game channel and be the first correct answer to earn credits.")
     .addFields(
       { name: "💣 **Word Bomb**", value: "\u200b" },
       { name: "`!setgame #channel` • `/setgame channel`", value: "Set the one channel where Word Bomb and Truth or Dare can be played. *(Manage Server)*" },
@@ -200,6 +201,9 @@ function page5(): EmbedBuilder {
       { name: "`!wbstop` / `!wordbomb stop` • `/wbstop`", value: "Stop the current Word Bomb game in the configured games channel. *(Manage Server)*" },
       { name: "`!wbtop` • `/wbtop`", value: "Show the Word Bomb win leaderboard in the configured games channel." },
       { name: "`!truthordare [@user]` / `!tod` • `/truthordare`", value: "The selected player can choose a random Truth/Dare or write and submit their own prompt. Available only in the configured games channel." },
+      { name: "<:world:1563228194247802882> **Knowledge Games**", value: "`!games capital` — Country Capitals (**200 credits**)\n`!games celebrity` — Identify the Celebrity (**200 credits**)\n`!games trivia` — Trivia Quiz (**100 credits**)" },
+      { name: "<:reaction:1558393068254666785> **Word Games**", value: "`!games letter` — Letter + Theme (**200 credits**)\nExample: **LETTER K • THEME FRUITS**\nFirst correct answer wins the reward." },
+      { name: "<:reward:1558393075829702726> **Challenge Games**", value: "`!games math` — Math Challenge (**100 credits**)\n`!games number` — Guess the Number (**100 credits**)\n`/games type` is available for every game." },
       { name: "✅ **Command notes**", value: "Slash commands appear server-by-server after the bot starts. Prefix commands continue to work as before.\n\nFor accurate online/offline presence counts, enable **Server Members Intent** and **Presence Intent** in the Discord Developer Portal." },
       { name: "💳 **Credits**", value: "Check your balance with `!credit` or `!credits`. Earn **20 credits** from chat once per minute, **10–100 credits** in a reaction drop, or different random rewards for two active chatters every 30 minutes (21+ messages each in the last 10 minutes): **Common 50**, **Rare 100**, or very rare **Epic 200 credits**. Set their announcement channel with `!setchatreward #channel` or `/setchatreward`; check with `status`, or clear with `remove`. Spend credits on server roles with `!shop` and `!shop buy @role`." },
       { name: "🦉 **Credit drops**", value: "A random rarity drop appears on each configured channel. The first correct reaction wins **Common: 100–200**, **Rare: 200–500**, or **Epic: 500–1,000 credits**. Server managers can repeat `!creditdrop setup #channel [30m]` for multiple channels; remove one with `!creditdrop remove #channel`. Set an interval for all channels with `!creditdrop interval 1h` or one channel with `!creditdrop interval 1h #channel` (0m–24h). Check with `!creditdrop status`; pause or resume all channels, or one selected channel, with `!creditdrop pause [#channel]` / `resume [#channel]`." },
@@ -210,9 +214,8 @@ function page5(): EmbedBuilder {
 function pageEconomy(): EmbedBuilder {
   return helpPage("💰 Economy")
     .addFields(
-      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\n`!top credits` — browse the credits leaderboard with Next/Previous buttons\n`!credits add @user <amount>` / `give` / `remove` — adjust a member's balance (**Manage Server**).\nTwo chatters with 21+ messages each in 10 minutes receive different tiers: **Common 50**, **Rare 100**, or very rare **Epic 200 credits**." },
-      { name: "🎉 **Credit Airdrop**", value: "`!airdrop <credits> <duration>` / `/airdrop create` — start a timed drop with an Enter button. Everyone who joins splits the pot evenly; leftover credits are distributed one each. Example: `!airdrop 200 10m`. *(Manage Server)*" },
-      { name: "🗺️ **Flag drops**", value: "Guess the country shown in the flag image; the first correct answer wins a random credit-drop tier: **Common 100–200**, **Rare 200–500**, or **Epic 500–1,000 credits**. Server managers can set up multiple channels with `!flagdrop setup #channel [30m]`; intervals are 0m–24h. Use `!flagdrop status`, `!flagdrop interval 1h [#channel]`, `!flagdrop pause [#channel]`, `!flagdrop resume [#channel]`, or `!flagdrop remove #channel`." },
+      { name: "💳 **Credits**", value: "`!credit` / `!credits` — check your balance\n`!transfer @user <amount>` or `!give @user <amount>` — send your credits to another server member\n`!top credits` — browse the credits leaderboard with Next/Previous buttons\n`!credits add @user <amount>` / `give` / `remove` — adjust a member's balance (**Manage Server**).\nTwo chatters with 21+ messages each in 10 minutes receive different tiers: **Common 50**, **Rare 100**, or very rare **Epic 200 credits**." },
+      { name: "🗺️ **Flag drops**", value: "Guess the country shown in the flag image; the first correct answer wins a random credit-drop tier: **Common 100–200**, **Rare 200–500**, or **Epic 500–1,000 credits**. Server managers can set up multiple channels with `!flagdrop setup #channel [15m]`; intervals are 0m–24h. Use `!flagdrop status`, `!flagdrop interval 1h [#channel]`, `!flagdrop pause [#channel]`, `!flagdrop resume [#channel]`, or `!flagdrop remove #channel`." },
       { name: "🏷️ **Role shop**", value: "`!shop` — browse numbered role/price pages\n`!shop buy @role` or `!shop buy Role Name` — buy with credits\n`!shop role @role` — buy a listed role\n`!shop add @role <price>` — add a listing\n`!shop edit @role <new-price>` — edit its price\n`!shop remove @role` — remove a listing (**Manage Server**)" },
     )
     .setFooter({ text: HELP_FOOTER });

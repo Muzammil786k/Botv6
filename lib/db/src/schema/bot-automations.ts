@@ -1,4 +1,4 @@
-import { pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
 export const botChannelAutomationsTable = pgTable(
   "bot_channel_automations",
@@ -9,6 +9,7 @@ export const botChannelAutomationsTable = pgTable(
     autoResponseTrigger: text("auto_response_trigger"),
     autoResponseContent: text("auto_response_content"),
     stickyContent: text("sticky_content"),
+    stickyUseEmbed: boolean("sticky_use_embed").notNull().default(true),
     stickyMessageId: text("sticky_message_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },

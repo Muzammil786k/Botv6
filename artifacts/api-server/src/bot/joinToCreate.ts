@@ -447,6 +447,10 @@ async function handleJtcButton(interaction: ButtonInteraction): Promise<void> {
   }
 
   if (action === "claim") {
+    if (interaction.user.bot) {
+      await interaction.reply({ content: "Bot accounts cannot own temporary voice channels.", flags: MessageFlags.Ephemeral });
+      return;
+    }
     const claimError = getClaimError(channel, interaction.user.id);
     if (claimError) {
       await interaction.reply({ content: claimError, flags: MessageFlags.Ephemeral });
@@ -785,6 +789,10 @@ export async function handleVcCommand(message: Message, args: string[]): Promise
       }
       if (target.id === ownerId) {
         await message.reply("You are already the owner of this channel.");
+        return;
+      }
+      if (target.user.bot) {
+        await message.reply("Bot accounts cannot own temporary voice channels.");
         return;
       }
       if (target.voice.channelId !== channel.id) {
@@ -1146,6 +1154,14 @@ async function handleJtcTransferSubmit(interaction: ModalSubmitInteraction): Pro
     return;
   }
 
+  if (targetMember.user.bot) {
+    await interaction.reply({
+      content: "Bot accounts cannot own temporary voice channels.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
   if (targetMember.voice.channelId !== channel.id) {
     await interaction.reply({
       content: "That member must be in this voice channel to become the new owner.",
@@ -1156,7 +1172,7 @@ async function handleJtcTransferSubmit(interaction: ModalSubmitInteraction): Pro
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   await transferOwnership(channel, targetMember.id, interaction.user.id);
-  await persistTempChannel(channel.id, guild.id, targetMember.id);
+  await persistTempChannel(channel.id, channel.guild.id, targetMember.id);
   await interaction.editReply({ content: `👑 Ownership transferred to <@${targetMember.id}>.` });
 }
 

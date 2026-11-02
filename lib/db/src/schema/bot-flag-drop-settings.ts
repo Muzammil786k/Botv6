@@ -5,7 +5,7 @@ export const botFlagDropSettingsTable = pgTable(
   {
     guildId: text("guild_id").notNull(),
     channelId: text("channel_id").notNull(),
-    intervalMinutes: integer("interval_minutes").notNull().default(30),
+    intervalMinutes: integer("interval_minutes").notNull().default(15),
     enabled: boolean("enabled").notNull().default(true),
     nextDropAt: bigint("next_drop_at", { mode: "number" }).notNull().default(0),
     activeMessageId: text("active_message_id"),

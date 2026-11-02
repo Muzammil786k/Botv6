@@ -227,3 +227,19 @@ export async function awardChatCredits(message: Message): Promise<void> {
     );
   }
 }
+
+export async function awardGameCredits(guildId: string, userId: string, credits: number): Promise<void> {
+  try {
+    await db.insert(botMiningProfilesTable)
+      .values({ guildId, userId, coins: credits })
+      .onConflictDoUpdate({
+        target: [botMiningProfilesTable.guildId, botMiningProfilesTable.userId],
+        set: {
+          coins: sql<number>`${botMiningProfilesTable.coins} + ${credits}`,
+          updatedAt: new Date(),
+        },
+      });
+  } catch (error) {
+    logger.error({ err: error, guildId, userId, credits }, "Failed to award game credits");
+  }
+}

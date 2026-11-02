@@ -16,7 +16,7 @@ import { logger } from "../lib/logger";
 import { findFlagCountry, FLAG_COUNTRIES, isCorrectFlagCountryAnswer } from "./flagCountries";
 import { CREDIT_DROP_TIERS, chooseCreditDropReward, type CreditDropTier } from "./crates";
 
-const DEFAULT_INTERVAL_MINUTES = 30;
+const DEFAULT_INTERVAL_MINUTES = 15;
 const MIN_INTERVAL_MINUTES = 0;
 const MAX_INTERVAL_MINUTES = 24 * 60;
 const FLAG_DROP_LIFETIME_MS = 10 * 60_000;
@@ -103,13 +103,13 @@ export async function handleFlagDropCommand(message: Message): Promise<void> {
       const mentioned = message.mentions.channels.first();
       const channel = mentioned ? guild.channels.cache.get(mentioned.id) : undefined;
       if (!channel || channel.type !== ChannelType.GuildText) {
-        await message.reply("Usage: `!flagdrop setup #text-channel [30m]`.");
+        await message.reply("Usage: `!flagdrop setup #text-channel [15m]`.");
         return;
       }
       const intervalArgument = args.find((argument) => argument !== `<#${channel.id}>`);
       const intervalMinutes = intervalArgument ? parseInterval(intervalArgument) : DEFAULT_INTERVAL_MINUTES;
       if (intervalMinutes === null) {
-        await message.reply(`❌ Interval must be ${MIN_INTERVAL_MINUTES}m–24h, for example \`30m\` or \`2h\`.`);
+        await message.reply(`❌ Interval must be ${MIN_INTERVAL_MINUTES}m–24h, for example \`15m\` or \`2h\`.`);
         return;
       }
       const [existing] = await getFlagDropSettings(guild.id, channel.id);
@@ -243,7 +243,7 @@ export async function handleFlagDropCommand(message: Message): Promise<void> {
       return;
     }
 
-    await message.reply("Usage: `!flagdrop setup #channel [30m]`, `!flagdrop remove #channel`, `!flagdrop interval 1h [#channel]`, `!flagdrop status`, `!flagdrop pause [#channel]`, or `!flagdrop resume [#channel]`.");
+    await message.reply("Usage: `!flagdrop setup #channel [15m]`, `!flagdrop remove #channel`, `!flagdrop interval 1h [#channel]`, `!flagdrop status`, `!flagdrop pause [#channel]`, or `!flagdrop resume [#channel]`.");
   } catch (error) {
     logger.error({ err: error, guildId: guild.id, action: normalizedAction }, "Flag drop settings command failed");
     await message.reply("❌ Could not update flag drop settings. Please try again.");
