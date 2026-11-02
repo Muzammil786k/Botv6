@@ -270,19 +270,8 @@ const slashCommands = [
     .setDescription("Start a Word Bomb game in the configured games channel."),
   new SlashCommandBuilder()
     .setName("games")
-    .setDescription("Play a credit-reward knowledge or word game.")
-    .addStringOption((option) => option
-      .setName("type")
-      .setDescription("Choose a game")
-      .setRequired(true)
-      .addChoices(
-        { name: "Country Capitals", value: "capital" },
-        { name: "Celebrity Identify", value: "celebrity" },
-        { name: "Letter + Theme", value: "letter" },
-        { name: "Trivia Quiz", value: "trivia" },
-        { name: "Math Challenge", value: "math" },
-        { name: "Guess the Number", value: "number" },
-      )),
+    .setDescription("Configure automatic credit-reward games.")
+    .addStringOption((option) => option.setName("args").setDescription("setup #channel 30m 100, status, interval, reward, pause, resume, or remove")),
   new SlashCommandBuilder()
     .setName("truthordare")
     .setDescription("Play Truth or Dare in the configured games channel.")
@@ -673,7 +662,7 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
     case "truthordare":
       return `!truthordare ${mentionContent(interaction, "user")}`.trim();
     case "games":
-      return `!games ${string("type")}`;
+      return `!games ${string("args")}`.trim();
     case "voice":
       return `!voice ${interaction.options.getSubcommand(false) ?? "help"}`;
     case "ship":

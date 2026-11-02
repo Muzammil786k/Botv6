@@ -18,6 +18,7 @@ import { logger } from "../lib/logger";
 import { processUserMessageAutomations, sendMemberMessage } from "./automation";
 import { handleCreditDropReaction, startCreditDropScheduler } from "./crates";
 import { startFlagDropScheduler } from "./flagDrop";
+import { handleCreditGameInteraction, startGamesScheduler } from "./games";
 import { handleStatusRolePresenceUpdate } from "./statusRole";
 import { handleGuildTagRoleUserUpdate } from "./guildTagRole";
 import { handleTruthOrDareModal } from "./truthordare";
@@ -54,6 +55,7 @@ export function createBot(): Client {
     client.user?.setActivity("🎉 Giveaways | !help | /help");
     startCreditDropScheduler(client);
     startFlagDropScheduler(client);
+    startGamesScheduler(client);
     startTempChannelCleanupScheduler(client);
     startReminderScheduler(client);
     void registerSlashCommands(client);
@@ -163,6 +165,17 @@ export function createBot(): Client {
     }
     if (interaction.isButton() && interaction.customId.startsWith("social:back:")) {
       await handleSocialBackButton(interaction);
+      return;
+    }
+    if (interaction.isButton() && interaction.customId.startsWith("games:trivia:")) {
+      try {
+        await handleCreditGameInteraction(interaction);
+      } catch (err) {
+        logger.error({ err, customId: interaction.customId }, "Error handling trivia answer");
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "Could not process that trivia answer.", ephemeral: true }).catch(() => {});
+        }
+      }
       return;
     }
     if (interaction.isButton() && (interaction.customId === "ticket:open" || interaction.customId.startsWith("ticket:close:"))) {

@@ -1,6 +1,6 @@
 import { and, eq, lte } from "drizzle-orm";
-import { ChannelType, EmbedBuilder, type Client, type Message } from "discord.js";
-import { botScheduledMessagesTable, db } from "@workspace/db";
+import { ChannelType, EmbedBuilder, PermissionFlagsBits, type Client, type Message } from "discord.js";
+import { botBumpSettingsTable, botScheduledMessagesTable, db } from "@workspace/db";
 import { logger } from "../lib/logger";
 
 const MAX_DURATION_MS = 7 * 24 * 60 * 60_000;
@@ -22,7 +22,6 @@ function parseDuration(value: string | undefined): number | null {
 
 async function reply(message: Message, title: string, description: string): Promise<void> {
   await message.reply({
-    suppressHelpFooter: true,
     embeds: [new EmbedBuilder().setColor(0x5865f2).setTitle(title).setDescription(description)],
     allowedMentions: { parse: [], repliedUser: false },
   });
@@ -126,6 +125,46 @@ export async function handleTimerCommand(message: Message): Promise<void> {
 const DISBOARD_BOT_ID = "302050872383242240";
 const BUMP_INTERVAL_MS = 2 * 60 * 60_000;
 
+export async function handleBumpCommand(message: Message): Promise<void> {
+  const guild = message.guild;
+  if (!guild) return;
+  const member = message.member ?? await guild.members.fetch(message.author.id).catch(() => null);
+  if (!member?.permissions.has(PermissionFlagsBits.ManageGuild) && !member?.permissions.has(PermissionFlagsBits.Administrator)) {
+    await message.reply("❌ You need **Manage Server** permission to configure bump role mentions.");
+    return;
+  }
+
+  const [, action = "status"] = message.content.trim().split(/\s+/);
+  if (action.toLowerCase() === "remove" || action.toLowerCase() === "clear") {
+    await db.delete(botBumpSettingsTable).where(eq(botBumpSettingsTable.guildId, guild.id));
+    await message.reply("✅ Bump role mentions removed.");
+    return;
+  }
+  if (action.toLowerCase() === "roles" || action.toLowerCase() === "set") {
+    const roleIds = [...new Set(message.mentions.roles.map((role) => role.id))];
+    if (roleIds.length === 0) {
+      await message.reply("Usage: `!bump roles @role1 @role2`.");
+      return;
+    }
+    await db.insert(botBumpSettingsTable)
+      .values({ guildId: guild.id, roleIds })
+      .onConflictDoUpdate({
+        target: botBumpSettingsTable.guildId,
+        set: { roleIds, updatedAt: new Date() },
+      });
+    await message.reply(`✅ Bump reminders will mention ${roleIds.map((roleId) => `<@&${roleId}>`).join(", ")}.`);
+    return;
+  }
+
+  const [settings] = await db.select({ roleIds: botBumpSettingsTable.roleIds })
+    .from(botBumpSettingsTable)
+    .where(eq(botBumpSettingsTable.guildId, guild.id))
+    .limit(1);
+  await message.reply(settings?.roleIds.length
+    ? `📣 Bump reminders mention: ${settings.roleIds.map((roleId) => `<@&${roleId}>`).join(", ")}`
+    : "📣 No bump roles are configured. Use `!bump roles @role1 @role2` or `!bump remove`.");
+}
+
 export async function handleBumpMessage(message: Message): Promise<void> {
   if (!message.guild || message.author.id !== DISBOARD_BOT_ID) return;
   const text = message.embeds.map((e) => e.description ?? "").join("\n");
@@ -133,6 +172,11 @@ export async function handleBumpMessage(message: Message): Promise<void> {
 
   const bumper = message.interactionMetadata?.user ?? message.interaction?.user;
   const channelId = message.channelId;
+  const [bumpSettings] = await db.select({ roleIds: botBumpSettingsTable.roleIds })
+    .from(botBumpSettingsTable)
+    .where(eq(botBumpSettingsTable.guildId, message.guild.id))
+    .limit(1);
+  const roleIds = bumpSettings?.roleIds ?? [];
   await db.delete(botScheduledMessagesTable).where(and(
     eq(botScheduledMessagesTable.guildId, message.guild.id),
     eq(botScheduledMessagesTable.channelId, channelId),
@@ -148,9 +192,10 @@ export async function handleBumpMessage(message: Message): Promise<void> {
     dueAt,
   });
   if (!message.channel.isSendable()) return;
+  const roleMentions = roleIds.map((roleId) => `<@&${roleId}>`).join(" ");
   await message.channel.send({
-    content: `Thanks for bumping! I'll remind you <t:${Math.floor(dueAt.getTime() / 1000)}:R>.`,
-    allowedMentions: { parse: [] },
+    content: `${roleMentions ? `${roleMentions} ` : ""}Thanks for bumping! I'll remind you <t:${Math.floor(dueAt.getTime() / 1000)}:R>.`,
+    allowedMentions: { parse: [], roles: roleIds },
   }).catch(() => undefined);
 }
 
@@ -179,9 +224,15 @@ async function deliverDueMessages(client: Client): Promise<void> {
         } else if (scheduled.kind === "bump") {
           const channel = await client.channels.fetch(scheduled.channelId).catch(() => null);
           if (channel?.type === ChannelType.GuildText || channel?.type === ChannelType.GuildAnnouncement) {
+            const [bumpSettings] = await db.select({ roleIds: botBumpSettingsTable.roleIds })
+              .from(botBumpSettingsTable)
+              .where(eq(botBumpSettingsTable.guildId, scheduled.guildId))
+              .limit(1);
+            const roleIds = bumpSettings?.roleIds ?? [];
+            const roleMentions = roleIds.map((roleId) => `<@&${roleId}>`).join(" ");
             await channel.send({
-              content: `<@${scheduled.userId}> ${scheduled.content}`,
-              allowedMentions: { users: [scheduled.userId] },
+              content: `${roleMentions ? `${roleMentions} ` : ""}<@${scheduled.userId}> ${scheduled.content}`,
+              allowedMentions: { users: [scheduled.userId], roles: roleIds },
             });
           }
         } else {
