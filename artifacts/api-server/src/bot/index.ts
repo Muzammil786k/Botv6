@@ -50,7 +50,7 @@ export function createBot(): Client {
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Reaction],
   });
-  client.once("ready", () => {
+  client.once("clientReady", () => {
     logger.info({ tag: client.user?.tag }, "Discord bot is ready");
     client.user?.setActivity("🎉 Giveaways | !help | /help");
     startCreditDropScheduler(client);
