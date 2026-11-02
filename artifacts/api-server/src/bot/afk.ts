@@ -35,7 +35,6 @@ export async function handleAfk(message: Message, transformedContent?: string): 
     const away = formatDuration(Date.now() - entry.since);
     afkUsers.delete(userId);
     await message.reply({
-      suppressHelpFooter: true,
       embeds: [
         new EmbedBuilder()
           .setColor(0xff0000)
@@ -56,7 +55,6 @@ export async function handleAfk(message: Message, transformedContent?: string): 
     const since = Date.now();
     afkUsers.set(userId, { status, since });
     await message.reply({
-      suppressHelpFooter: true,
       embeds: [
         new EmbedBuilder()
           .setColor(0xff0000)
@@ -72,7 +70,6 @@ export async function handleAfk(message: Message, transformedContent?: string): 
       const entry = afkUsers.get(mentionedUser.id)!;
       const away = formatDuration(Date.now() - entry.since);
       await message.reply({
-        suppressHelpFooter: true,
         embeds: [
           new EmbedBuilder()
             .setColor(0xff0000)

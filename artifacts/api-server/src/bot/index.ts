@@ -123,8 +123,10 @@ export function createBot(): Client {
   });
 
   client.on("presenceUpdate", (oldPresence, newPresence) => {
+    const presenceGuild = newPresence.guild;
+    if (!presenceGuild) return;
     void handleStatusRolePresenceUpdate(oldPresence, newPresence).catch((err) => {
-      logger.error({ err, guildId: newPresence.guild.id, userId: newPresence.userId }, "Error handling status-role presence update");
+      logger.error({ err, guildId: presenceGuild.id, userId: newPresence.userId }, "Error handling status-role presence update");
     });
   });
 

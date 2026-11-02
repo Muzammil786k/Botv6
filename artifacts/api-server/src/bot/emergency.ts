@@ -7,6 +7,7 @@ import {
   type Guild,
   type GuildBan,
   type GuildMember,
+  type PartialGuildMember,
   type Message,
   type PartialUser,
   type Role,
@@ -209,7 +210,7 @@ export async function handleEmergencyBanAdd(client: Client, ban: GuildBan): Prom
   await recordAuditAction(ban.guild, ban.user.id, AuditLogEvent.MemberBanAdd, "bans", client);
 }
 
-export async function handleEmergencyMemberRemove(client: Client, member: GuildMember): Promise<void> {
+export async function handleEmergencyMemberRemove(client: Client, member: GuildMember | PartialGuildMember): Promise<void> {
   await recordAuditAction(member.guild, member.id, AuditLogEvent.MemberKick, "kicks", client);
 }
 
