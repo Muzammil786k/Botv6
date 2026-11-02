@@ -11,7 +11,7 @@ PORT=5000 pnpm --filter @workspace/api-server run dev
 
 ## Railway deployment
 
-Railway uses `railway.json` to build and start the API server. The start command pushes the Drizzle schema before starting the bot, so database tables are created or updated on deployment. Add these variables to the Railway service:
+Railway uses `railway.json` to build and start the API server. The pre-deploy command runs the database migration and pushes the Drizzle schema before starting the bot, so database tables are created or updated before the bot connects. Add these variables to the Railway service:
 
 - `DATABASE_URL` — PostgreSQL connection string used by the bot
 - `DISCORD_BOT_TOKEN` — Discord bot token
