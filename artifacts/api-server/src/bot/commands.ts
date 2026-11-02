@@ -29,7 +29,7 @@ import {
   handleBanner,
   handleSnipe,
 } from "./utility";
-import { handleReminderCommand, handleTimerCommand } from "./reminders";
+import { handleBumpCommand, handleReminderCommand, handleTimerCommand } from "./reminders";
 import { handleShip, handleSocialAction, SOCIAL_ACTIONS, type SocialActionName } from "./social";
 import { handleSteal } from "./steal";
 import { handleAutoModeration, handleAutomodCommand } from "./moderation";
@@ -146,6 +146,8 @@ export async function handleMessage(
     await handleReminderCommand(message);
   } else if (lower === "!timer" || lower.startsWith("!timer ")) {
     await handleTimerCommand(message);
+  } else if (lower === "!bump" || lower.startsWith("!bump ")) {
+    await handleBumpCommand(message);
   } else if (lower === "!statusrole" || lower.startsWith("!statusrole ")) {
     await handleStatusRoleCommand(message);
   } else if (lower === "!guildtagrole" || lower.startsWith("!guildtagrole ")) {

@@ -1,9 +1,23 @@
-import { EmbedBuilder, type Message, type TextChannel } from "discord.js";
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ChannelType,
+  EmbedBuilder,
+  type ButtonInteraction,
+  type Message,
+  type TextChannel,
+} from "discord.js";
+import { and, eq } from "drizzle-orm";
+import { botGameSettingsTable, db } from "@workspace/db";
 import { premiumColors, premiumMessagePayload } from "./presentation";
-import { requireGameChannel } from "./gameChannel";
 import { awardGameCredits } from "./credits";
 
 const ROUND_TIME_MS = 30_000;
+const DEFAULT_INTERVAL_MINUTES = 30;
+const MIN_INTERVAL_MINUTES = 1;
+const MAX_INTERVAL_MINUTES = 24 * 60;
+const MAX_REWARD = 2_147_483_647;
 const EXISTING_GAME_REWARD = 200;
 const NEW_GAME_REWARD = 100;
 const GAME_EMOJIS = {
@@ -27,6 +41,8 @@ interface Round {
   prompt: string;
   answers: Set<string>;
   reward: number;
+  imageUrl?: string;
+  triviaOptions?: string[];
   timer: NodeJS.Timeout;
 }
 
@@ -39,6 +55,7 @@ interface CapitalQuestion {
 interface CelebrityQuestion {
   name: string;
   clues: string;
+  imageUrl: string;
 }
 
 interface LetterQuestion {
@@ -72,16 +89,16 @@ const CAPITAL_QUESTIONS: CapitalQuestion[] = [
 ];
 
 const CELEBRITY_QUESTIONS: CelebrityQuestion[] = [
-  { name: "Taylor Swift", clues: "I am a singer-songwriter known for Eras, Red, and Love Story." },
-  { name: "Leonardo DiCaprio", clues: "I am an actor who starred in Titanic, Inception, and The Revenant." },
-  { name: "Beyonce", clues: "I am a singer known for Lemonade, Halo, and a career with Destiny's Child." },
-  { name: "Dwayne Johnson", clues: "I am an actor and former wrestler known as The Rock." },
-  { name: "Adele", clues: "I am a singer known for Hello, Someone Like You, and 21." },
-  { name: "Tom Hanks", clues: "I am an actor known for Forrest Gump, Cast Away, and Toy Story." },
-  { name: "Rihanna", clues: "I am a singer known for Umbrella, Diamonds, and Fenty." },
-  { name: "Shah Rukh Khan", clues: "I am an Indian actor known as the King of Bollywood." },
-  { name: "Cristiano Ronaldo", clues: "I am a Portuguese footballer known for many Champions League goals." },
-  { name: "Lady Gaga", clues: "I am a singer and actor known for Poker Face and A Star Is Born." },
+  { name: "Taylor Swift", clues: "I am a singer-songwriter known for Eras, Red, and Love Story.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f2/Taylor_Swift_2_-_2019_by_Glenn_Francis.jpg" },
+  { name: "Leonardo DiCaprio", clues: "I am an actor who starred in Titanic, Inception, and The Revenant.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/4/46/Leonardo_DiCaprio_2016.jpg" },
+  { name: "Beyonce", clues: "I am a singer known for Lemonade, Halo, and a career with Destiny's Child.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/1c/Beyonce_-_The_Mrs._Carter_Show_Tour%2C_Los_Angeles%2C_2013.jpg" },
+  { name: "Dwayne Johnson", clues: "I am an actor and former wrestler known as The Rock.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/1c/Dwayne_Johnson_2014.jpg" },
+  { name: "Adele", clues: "I am a singer known for Hello, Someone Like You, and 21.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/7/7c/Adele_2016.jpg" },
+  { name: "Tom Hanks", clues: "I am an actor known for Forrest Gump, Cast Away, and Toy Story.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/a/a9/Tom_Hanks_Toy_Story_3_2010.jpg" },
+  { name: "Rihanna", clues: "I am a singer known for Umbrella, Diamonds, and Fenty.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/1b/Rihanna_Fenty_2018.png" },
+  { name: "Shah Rukh Khan", clues: "I am an Indian actor known as the King of Bollywood.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/18/Shah_Rukh_Khan_graces_the_launch_of_the_new_Samsung_phone.jpg" },
+  { name: "Cristiano Ronaldo", clues: "I am a Portuguese footballer known for many Champions League goals.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/8/8c/Cristiano_Ronaldo_2018.jpg" },
+  { name: "Lady Gaga", clues: "I am a singer and actor known for Poker Face and A Star Is Born.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/3/3f/Lady_Gaga_at_the_2018_Toronto_International_Film_Festival.jpg" },
 ];
 
 const LETTER_QUESTIONS: LetterQuestion[] = [
@@ -124,6 +141,8 @@ const TRIVIA_QUESTIONS: TriviaQuestion[] = [
 ];
 
 const rounds = new Map<string, Round>();
+let scheduler: NodeJS.Timeout | undefined;
+let schedulerRunning = false;
 
 function normalize(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ");
@@ -131,6 +150,36 @@ function normalize(value: string): string {
 
 function randomItem<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)]!;
+}
+
+function parseInterval(value: string | undefined): number | null {
+  const match = /^(\d+)(m|h)$/i.exec(value ?? "");
+  if (!match) return null;
+  const amount = Number(match[1]);
+  const minutes = amount * (match[2]!.toLowerCase() === "h" ? 60 : 1);
+  return Number.isSafeInteger(minutes) && minutes >= MIN_INTERVAL_MINUTES && minutes <= MAX_INTERVAL_MINUTES
+    ? minutes
+    : null;
+}
+
+function parseReward(value: string | undefined): number | null {
+  if (!/^\d+$/.test(value ?? "")) return null;
+  const reward = Number(value);
+  return Number.isSafeInteger(reward) && reward >= 1 && reward <= MAX_REWARD ? reward : null;
+}
+
+function triviaButtons(guildId: string, channelId: string, options: string[], disabled = false): ActionRowBuilder<ButtonBuilder>[] {
+  return [new ActionRowBuilder<ButtonBuilder>().addComponents(
+    options.map((option, index) => new ButtonBuilder()
+      .setCustomId(`games:trivia:${guildId}:${channelId}:${index}`)
+      .setLabel(option.slice(0, 80))
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled)),
+  )];
+}
+
+function roundKey(guildId: string, channelId: string): string {
+  return `${guildId}:${channelId}`;
 }
 
 function gameLabel(type: GameType): string {
@@ -156,7 +205,7 @@ function parseGameType(value: string | undefined): GameType | null {
   return null;
 }
 
-function createQuestion(type: GameType): { prompt: string; answers: Set<string>; reward: number } {
+function createQuestion(type: GameType): { prompt: string; answers: Set<string>; reward: number; imageUrl?: string; triviaOptions?: string[] } {
   if (type === "capital") {
     const question = randomItem(CAPITAL_QUESTIONS);
     return {
@@ -172,6 +221,7 @@ function createQuestion(type: GameType): { prompt: string; answers: Set<string>;
       prompt: `Who am I?\n${question.clues}`,
       answers: new Set([normalize(question.name)]),
       reward: EXISTING_GAME_REWARD,
+      imageUrl: question.imageUrl,
     };
   }
 
@@ -186,10 +236,17 @@ function createQuestion(type: GameType): { prompt: string; answers: Set<string>;
 
   if (type === "trivia") {
     const question = randomItem(TRIVIA_QUESTIONS);
+    const distractors = TRIVIA_QUESTIONS
+      .filter((candidate) => candidate !== question)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3)
+      .map((candidate) => candidate.answer);
+    const options = [question.answer, ...distractors].sort(() => Math.random() - 0.5);
     return {
       prompt: question.question,
       answers: new Set([normalize(question.answer), ...(question.aliases ?? []).map(normalize)]),
       reward: NEW_GAME_REWARD,
+      triviaOptions: options,
     };
   }
 
@@ -219,8 +276,9 @@ async function endRound(
   round: Round,
   winnerId?: string,
 ): Promise<void> {
-  if (rounds.get(guildId) !== round) return;
-  rounds.delete(guildId);
+  const key = roundKey(guildId, channel.id);
+  if (rounds.get(key) !== round) return;
+  rounds.delete(key);
   clearTimeout(round.timer);
 
   if (!winnerId) {
@@ -232,46 +290,205 @@ async function endRound(
   await channel.send(premiumMessagePayload(`${GAME_EMOJIS.reward} <@${winnerId}> solved **${gameLabel(round.type)}** first and won ${GAME_EMOJIS.credits} **${round.reward} credits**!`, channel.client.user));
 }
 
-export async function handleCreditGameCommand(message: Message, args: string[]): Promise<void> {
-  if (!message.guild || !(await requireGameChannel(message))) return;
-  const type = parseGameType(args[0]);
-  if (!type) {
-    await message.reply("Usage: `!games capital|celebrity|letter|trivia|math|number`.");
-    return;
-  }
-  if (rounds.has(message.guild.id)) {
-    await message.reply("❌ A credit game is already active in this server.");
-    return;
-  }
-
+async function startGameRound(
+  guildId: string,
+  channel: TextChannel,
+  type: GameType,
+  reward: number,
+): Promise<void> {
+  if (rounds.has(roundKey(guildId, channel.id))) return;
   const question = createQuestion(type);
-  const channel = message.channel as TextChannel;
   const round = {
     type,
     channelId: channel.id,
     prompt: question.prompt,
     answers: question.answers,
-    reward: question.reward,
+    reward,
+    imageUrl: question.imageUrl,
+    triviaOptions: question.triviaOptions,
     timer: undefined as unknown as NodeJS.Timeout,
   } satisfies Round;
   round.timer = setTimeout(() => {
-    void endRound(message.guild!.id, channel, round);
+    void endRound(guildId, channel, round);
   }, ROUND_TIME_MS);
-  rounds.set(message.guild.id, round);
+  rounds.set(roundKey(guildId, channel.id), round);
+
+  const embed = new EmbedBuilder()
+    .setColor(premiumColors.brand)
+    .setTitle(`${GAME_EMOJIS[type]} ${gameLabel(type)}`)
+    .setDescription(`${round.prompt}\n\n${GAME_EMOJIS.trophy} First correct answer wins ${GAME_EMOJIS.credits} **${round.reward} credits**.\n${GAME_EMOJIS.time} You have **30 seconds**!`);
+  if (round.imageUrl) embed.setImage(round.imageUrl);
 
   await channel.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(premiumColors.brand)
-        .setTitle(`${GAME_EMOJIS[type]} ${gameLabel(type)}`)
-        .setDescription(`${round.prompt}\n\n${GAME_EMOJIS.trophy} First correct answer wins ${GAME_EMOJIS.credits} **${round.reward} credits**.\n${GAME_EMOJIS.time} You have **30 seconds**!`),
-    ],
+    embeds: [embed],
+    ...(round.type === "trivia" && round.triviaOptions
+      ? { components: triviaButtons(guildId, channel.id, round.triviaOptions) }
+      : {}),
   });
+}
+
+export async function handleCreditGameCommand(message: Message, args: string[]): Promise<void> {
+  const guild = message.guild;
+  if (!guild) return;
+  const member = message.member ?? await guild.members.fetch(message.author.id).catch(() => null);
+  if (!member?.permissions.has("ManageGuild")) {
+    await message.reply("❌ You need **Manage Server** permission to configure games.");
+    return;
+  }
+
+  const gameType = parseGameType(args[0]);
+  if (!gameType) {
+    await message.reply("Usage: `!games <capital|celebrity|letter|trivia|math|number> <setup|status|interval|reward|pause|resume|remove>`.");
+    return;
+  }
+  const action = args[1]?.toLowerCase() ?? "status";
+  const settings = async () => db.select().from(botGameSettingsTable).where(and(
+    eq(botGameSettingsTable.guildId, guild.id),
+    eq(botGameSettingsTable.gameType, gameType),
+  )).limit(1);
+
+  if (action === "setup" || action === "set") {
+    const channel = message.mentions.channels.first();
+    const intervalArgument = args.find((value) => parseInterval(value) !== null);
+    const rewardArgument = args.find((value) => parseReward(value) !== null && value !== intervalArgument);
+    const intervalMinutes = intervalArgument ? parseInterval(intervalArgument) : DEFAULT_INTERVAL_MINUTES;
+    const reward = rewardArgument ? parseReward(rewardArgument) : NEW_GAME_REWARD;
+    if (!channel || channel.type !== 0 || intervalMinutes === null || reward === null) {
+      await message.reply(`Usage: \`!games ${gameType} setup #channel [30m] [100]\`.`);
+      return;
+    }
+    const now = Date.now();
+    await db.insert(botGameSettingsTable)
+      .values({ guildId: guild.id, gameType, channelId: channel.id, intervalMinutes, reward, enabled: true, nextGameAt: now + intervalMinutes * 60_000 })
+      .onConflictDoUpdate({
+        target: [botGameSettingsTable.guildId, botGameSettingsTable.gameType],
+        set: { channelId: channel.id, intervalMinutes, reward, enabled: true, nextGameAt: now + intervalMinutes * 60_000, updatedAt: new Date(now) },
+      });
+    await message.reply(`<:tick:1563231751432704131> **${gameLabel(gameType)}** enabled in ${channel}, every ${intervalMinutes} minutes, reward **${reward} credits**.`);
+    return;
+  }
+
+  if (action === "status") {
+    const [setting] = await settings();
+    await message.reply(setting
+      ? `${GAME_EMOJIS[gameType]} **${gameLabel(gameType)}**: <#${setting.channelId}>\nInterval: ${setting.intervalMinutes} minutes\nReward: ${setting.reward} credits\nStatus: ${setting.enabled ? "enabled" : "paused"}\nNext game: ${setting.enabled ? `<t:${Math.floor(setting.nextGameAt / 1000)}:R>` : "paused"}`
+      : `🎮 **${gameLabel(gameType)}** is not configured. Use \`!games ${gameType} setup #channel [30m] [100]\`.`);
+    return;
+  }
+
+  const [setting] = await settings();
+  if (!setting) {
+    await message.reply(`❌ Configure **${gameLabel(gameType)}** first with \`!games ${gameType} setup #channel [30m] [100]\`.`);
+    return;
+  }
+  const now = Date.now();
+  if (action === "interval") {
+    const intervalMinutes = parseInterval(args.find((value) => parseInterval(value) !== null));
+    if (intervalMinutes === null) {
+      await message.reply(`Usage: \`!games ${gameType} interval 30m\` (allowed: 1m–24h).`);
+      return;
+    }
+    await db.update(botGameSettingsTable).set({ intervalMinutes, nextGameAt: now + intervalMinutes * 60_000, updatedAt: new Date(now) }).where(and(eq(botGameSettingsTable.guildId, guild.id), eq(botGameSettingsTable.gameType, gameType)));
+    await message.reply(`<:tick:1563231751432704131> **${gameLabel(gameType)}** interval set to **${intervalMinutes} minutes**.`);
+    return;
+  }
+  if (action === "reward") {
+    const reward = parseReward(args[1]);
+    if (reward === null) {
+      await message.reply(`Usage: \`!games ${gameType} reward <amount>\` (1–${MAX_REWARD.toLocaleString()}).`);
+      return;
+    }
+    await db.update(botGameSettingsTable).set({ reward, updatedAt: new Date(now) }).where(and(eq(botGameSettingsTable.guildId, guild.id), eq(botGameSettingsTable.gameType, gameType)));
+    await message.reply(`<:tick:1563231751432704131> **${gameLabel(gameType)}** reward set to **${reward} credits**.`);
+    return;
+  }
+  if (action === "pause" || action === "resume") {
+    const enabled = action === "resume";
+    await db.update(botGameSettingsTable).set({ enabled, nextGameAt: enabled ? now + setting.intervalMinutes * 60_000 : setting.nextGameAt, updatedAt: new Date(now) }).where(and(eq(botGameSettingsTable.guildId, guild.id), eq(botGameSettingsTable.gameType, gameType)));
+    await message.reply(`<:tick:1563231751432704131> Automatic **${gameLabel(gameType)}** ${enabled ? "resumed" : "paused"}.`);
+    return;
+  }
+  if (action === "remove" || action === "off") {
+    await db.delete(botGameSettingsTable).where(and(eq(botGameSettingsTable.guildId, guild.id), eq(botGameSettingsTable.gameType, gameType)));
+    await message.reply(`<:tick:1563231751432704131> Automatic **${gameLabel(gameType)}** removed.`);
+    return;
+  }
+
+  await message.reply(`Usage: \`!games ${gameType} setup #channel [30m] [100]\`, \`interval 30m\`, \`reward 100\`, \`status\`, \`pause\`, \`resume\`, or \`remove\`.`);
+}
+
+export function startGamesScheduler(client: import("discord.js").Client): void {
+  if (scheduler) return;
+  const run = async () => {
+    if (schedulerRunning) return;
+    schedulerRunning = true;
+    try {
+      const now = Date.now();
+      const settings = await db.select().from(botGameSettingsTable).where(and(eq(botGameSettingsTable.enabled, true)));
+      for (const setting of settings) {
+        if (setting.nextGameAt > now || rounds.has(roundKey(setting.guildId, setting.channelId))) continue;
+        const [reserved] = await db.update(botGameSettingsTable)
+          .set({ nextGameAt: now + setting.intervalMinutes * 60_000, updatedAt: new Date(now) })
+          .where(and(
+            eq(botGameSettingsTable.guildId, setting.guildId),
+            eq(botGameSettingsTable.gameType, setting.gameType),
+            eq(botGameSettingsTable.enabled, true),
+            eq(botGameSettingsTable.nextGameAt, setting.nextGameAt),
+          ))
+          .returning({ guildId: botGameSettingsTable.guildId });
+        if (!reserved) continue;
+        const channel = await client.channels.fetch(setting.channelId).catch(() => null);
+        const gameType = parseGameType(setting.gameType);
+        if (gameType && channel?.type === 0 && channel.isSendable()) {
+          await startGameRound(setting.guildId, channel as TextChannel, gameType, setting.reward).catch((error) => {
+            console.error("Could not start scheduled game", error);
+          });
+        }
+      }
+    } finally {
+      schedulerRunning = false;
+    }
+  };
+  scheduler = setInterval(() => void run(), 30_000);
+  scheduler.unref();
+  void run();
+}
+
+export async function handleCreditGameInteraction(interaction: ButtonInteraction): Promise<void> {
+  if (!interaction.customId.startsWith("games:trivia:")) return;
+  const [, , guildId, channelId, rawIndex] = interaction.customId.split(":");
+  const round = interaction.guildId && interaction.channelId
+    ? rounds.get(roundKey(interaction.guildId, interaction.channelId))
+    : undefined;
+  const optionIndex = Number(rawIndex);
+  if (!round || round.type !== "trivia" || interaction.guildId !== guildId || interaction.channelId !== channelId || !round.triviaOptions || !Number.isInteger(optionIndex)) {
+    await interaction.reply({ content: "This trivia round has already ended.", ephemeral: true });
+    return;
+  }
+
+  const selected = round.triviaOptions[optionIndex];
+  if (!selected) {
+    await interaction.reply({ content: "That answer option is no longer available.", ephemeral: true });
+    return;
+  }
+
+  rounds.delete(roundKey(guildId, channelId));
+  clearTimeout(round.timer);
+  await interaction.update({ components: [] });
+
+  const channel = interaction.channel;
+  if (!channel || channel.type !== ChannelType.GuildText) return;
+  if (round.answers.has(normalize(selected))) {
+    await awardGameCredits(guildId, interaction.user.id, round.reward);
+    await channel.send(premiumMessagePayload(`${GAME_EMOJIS.reward} <@${interaction.user.id}> selected the correct answer and won ${GAME_EMOJIS.credits} **${round.reward} credits**!`, channel.client.user));
+  } else {
+    await interaction.followUp({ content: `${GAME_EMOJIS.time} Wrong answer. This trivia round is now closed.`, ephemeral: true });
+  }
 }
 
 export async function handleCreditGameAnswer(message: Message): Promise<void> {
   if (!message.guild || message.author.bot || message.content.trim().startsWith("!")) return;
-  const round = rounds.get(message.guild.id);
+  const round = rounds.get(roundKey(message.guild.id, message.channel.id));
   if (!round || round.channelId !== message.channel.id) return;
   if (!round.answers.has(normalize(message.content))) return;
   await endRound(message.guild.id, message.channel as TextChannel, round, message.author.id);
