@@ -57,7 +57,6 @@ export async function handleRoleInfo(message: Message): Promise<void> {
   const permissions = role.permissions.toArray();
   const permissionSummary = permissions.slice(0, 6).map((permission) => permission.replace(/([a-z])([A-Z])/g, "$1 $2")).join(", ") || "None";
   await message.reply({
-    suppressHelpFooter: true,
     embeds: [
       new EmbedBuilder()
         .setColor(role.color || C)
@@ -86,7 +85,6 @@ export async function handleBanner(message: Message): Promise<void> {
       .setDescription(bannerUrl ? `[Open banner](${bannerUrl})` : "This server has no banner set.");
     if (bannerUrl) embed.setImage(bannerUrl);
     await message.reply({
-      suppressHelpFooter: true,
       embeds: [embed],
       allowedMentions: { parse: [] },
     });
@@ -110,7 +108,6 @@ export async function handleBanner(message: Message): Promise<void> {
     .setDescription(bannerUrl ? `[Open banner](${bannerUrl})` : "This user has no profile banner set.");
   if (bannerUrl) embed.setImage(bannerUrl);
   await message.reply({
-    suppressHelpFooter: true,
     embeds: [embed],
     allowedMentions: { parse: [] },
   });
@@ -131,7 +128,6 @@ export async function handleSnipe(message: Message): Promise<void> {
     .setTimestamp(entry.deletedAt);
   if (entry.attachmentUrl) embed.addFields({ name: "Attachment", value: `[Open file](${entry.attachmentUrl})` });
   await message.reply({
-    suppressHelpFooter: true,
     embeds: [embed],
     allowedMentions: { parse: [] },
   });
@@ -163,7 +159,6 @@ export async function handleUserInfo(message: Message): Promise<void> {
   const createdAt = `<t:${Math.floor(target.user.createdAt.getTime() / 1000)}:F>`;
 
   await message.reply({
-    suppressHelpFooter: true,
     embeds: [
       new EmbedBuilder()
         .setColor(C)
@@ -190,7 +185,6 @@ export async function handleServerInfo(message: Message): Promise<void> {
   const bots = guild.members.cache.filter((m) => m.user.bot).size;
 
   await message.reply({
-    suppressHelpFooter: true,
     embeds: [
       new EmbedBuilder()
         .setColor(C)
@@ -275,7 +269,6 @@ function formatDuration(milliseconds: number): string {
 
 export async function handlePing(client: Client, message: Message): Promise<void> {
   await message.reply({
-    suppressHelpFooter: true,
     embeds: [
       new EmbedBuilder()
         .setColor(0x57f287)
@@ -288,7 +281,6 @@ export async function handlePing(client: Client, message: Message): Promise<void
 export async function handleBotInfo(client: Client, message: Message): Promise<void> {
   const user = client.user;
   await message.reply({
-    suppressHelpFooter: true,
     embeds: [
       new EmbedBuilder()
         .setColor(0x5865f2)
@@ -305,7 +297,6 @@ export async function handleChannelInfo(message: Message): Promise<void> {
   if (!message.guild) return;
   const channel = message.channel as TextChannel;
   await message.reply({
-    suppressHelpFooter: true,
     embeds: [
       new EmbedBuilder()
         .setColor(0x5865f2)
@@ -361,7 +352,6 @@ export async function handleQuote(message: Message): Promise<void> {
     );
     const attachment = new AttachmentBuilder(image, { name: "quote.png" });
     await message.reply({
-      suppressHelpFooter: true,
       embeds: [
         new EmbedBuilder()
           .setColor(0x000000)
@@ -386,7 +376,7 @@ export async function handleRole(message: Message): Promise<void> {
   }
 
   const target = message.mentions.members?.first();
-  let role = message.mentions.roles.first();
+  let role: Role | null | undefined = message.mentions.roles.first();
   if (!role) {
     const roleName = message.content.trim().split(/\s+/).slice(2).join(" ").replace(/^['"]|['"]$/g, "").trim();
     const matches = message.guild.roles.cache.filter(

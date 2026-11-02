@@ -198,8 +198,9 @@ export async function handleStatusRolePresenceUpdate(
   oldPresence: Presence | null,
   presence: Presence,
 ): Promise<void> {
-  if (presence.user.bot || presence.status === "offline") return;
+  if (!presence.user || presence.user.bot || presence.status === "offline") return;
   const guild = presence.guild;
+  if (!guild) return;
   const [settings] = await db.select()
     .from(botStatusRolesTable)
     .where(eq(botStatusRolesTable.guildId, guild.id))

@@ -200,7 +200,7 @@ export async function handleGuildTagRoleUserUpdate(
     if (!settings) continue;
 
     const previouslyHadTag = hasGuildTag(oldPrimaryGuild, guild.id);
-    const currentlyHasTag = hasGuildTag(newPrimaryGuild, guild.id);
+    const currentlyHasTag = newPrimaryGuild ? hasGuildTag(newPrimaryGuild, guild.id) : false;
     if (previouslyHadTag === currentlyHasTag) continue;
 
     const member = guild.members.cache.get(newUser.id) ?? await guild.members.fetch(newUser.id).catch(() => null);
@@ -209,7 +209,7 @@ export async function handleGuildTagRoleUserUpdate(
 
     if (currentlyHasTag && !member.roles.cache.has(role.id)) {
       await member.roles.add(role, "Member enabled this server's guild tag");
-      await sendGuildTagRoleLog(guild, settings, member.id, role.id, newPrimaryGuild.tag ?? "", true);
+      await sendGuildTagRoleLog(guild, settings, member.id, role.id, newPrimaryGuild?.tag ?? "", true);
     } else if (!currentlyHasTag && member.roles.cache.has(role.id)) {
       await member.roles.remove(role, "Member disabled this server's guild tag");
       await sendGuildTagRoleLog(guild, settings, member.id, role.id, oldPrimaryGuild?.tag ?? "", false);
