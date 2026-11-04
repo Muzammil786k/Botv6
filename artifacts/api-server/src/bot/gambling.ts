@@ -10,6 +10,7 @@ const MAX_BALANCE = 2_147_483_647;
 const COINFLIP_EMOJI = "<a:coinflip:1567512384338133093>";
 const HEADS_EMOJI = "<:heads:1567519192230400010>";
 const TAILS_EMOJI = "<:tails:1567519233418465380>";
+const COWONCY_EMOJI = "<:cowoncy:416043450337853441>";
 const COINFLIP_DELAY_MS = 1_500;
 
 type CoinSide = "heads" | "tails";
@@ -78,12 +79,16 @@ export async function handleCoinflipCommand(message: Message, args: string[] = m
     return;
   }
 
-  const resultMessage = await message.reply(COINFLIP_EMOJI);
+  const chosenSide = side === "heads" ? "heads" : "tails";
+  const resultMessage = await message.reply(
+    `**${message.author.displayName}** spent **${COWONCY_EMOJI} ${bet.toLocaleString()}** and chose **${chosenSide}**`,
+  );
   await new Promise((resolve) => setTimeout(resolve, COINFLIP_DELAY_MS));
+  const landedEmoji = result.landed === "heads" ? HEADS_EMOJI : TAILS_EMOJI;
   await resultMessage.edit(
     result.won
-        ? `${result.landed === "heads" ? HEADS_EMOJI : TAILS_EMOJI} — You won **${bet.toLocaleString()} credits**! Balance: **${result.balance.toLocaleString()}**.`
-        : `${result.landed === "heads" ? HEADS_EMOJI : TAILS_EMOJI} — You lost **${bet.toLocaleString()} credits**. Balance: **${result.balance.toLocaleString()}**.`,
+        ? `${COINFLIP_EMOJI} The coin spins... ${landedEmoji} and you won **${COWONCY_EMOJI} ${bet.toLocaleString()}**!`
+        : `${COINFLIP_EMOJI} The coin spins... ${landedEmoji} and you lost it all... :c`,
   );
 }
 
