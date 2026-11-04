@@ -33,12 +33,13 @@ export async function handleCoinflipCommand(message: Message, args: string[] = m
   if (!guild) return;
 
   const [first, second] = args;
-  const bet = parseBet(first) || parseBet(second);
-  const side = parseSide(first) ?? parseSide(second) ?? (Number.isSafeInteger(bet)
+  const allIn = first?.toLowerCase() === "all" && !second;
+  const parsedBet = parseBet(first) || parseBet(second);
+  const side = parseSide(first) ?? parseSide(second) ?? (allIn || Number.isSafeInteger(parsedBet)
     ? (randomInt(2) === 0 ? "heads" : "tails")
     : null);
-  if (!side || !Number.isSafeInteger(bet)) {
-    await message.reply(`Usage: \`!coinflip <heads|tails> <bet>\`, \`!cf <bet> <h|t>\`, or \`!cf <bet>\` for a random side (bet: ${MIN_BET.toLocaleString()}–${MAX_BET.toLocaleString()} credits).`);
+  if (!side || (!allIn && !Number.isSafeInteger(parsedBet))) {
+    await message.reply(`Usage: \`!coinflip <heads|tails> <bet>\`, \`!cf <bet> <h|t>\`, \`!cf <bet>\`, or \`!cf all\` for an all-in random flip (bet: ${MIN_BET.toLocaleString()}–${MAX_BET.toLocaleString()} credits).`);
     return;
   }
 
@@ -54,7 +55,10 @@ export async function handleCoinflipCommand(message: Message, args: string[] = m
       ))
       .for("update");
     if (!profile) throw new Error("Could not load gambling credit profile");
-    if (profile.coins < bet) return { status: "insufficient" as const, balance: profile.coins };
+    const bet = allIn ? profile.coins : parsedBet;
+    if (!Number.isSafeInteger(bet) || bet < MIN_BET || profile.coins < bet) {
+      return { status: "insufficient" as const, balance: profile.coins, bet: bet ?? 0 };
+    }
 
     const landed = randomInt(2) === 0 ? "heads" : "tails";
     const won = landed === side;
@@ -67,11 +71,11 @@ export async function handleCoinflipCommand(message: Message, args: string[] = m
         eq(botMiningProfilesTable.guildId, guild.id),
         eq(botMiningProfilesTable.userId, message.author.id),
       ));
-    return { status: "played" as const, landed, won, balance };
+    return { status: "played" as const, landed, won, balance, bet };
   });
 
   if (result.status === "insufficient") {
-    await message.reply(`You only have **${result.balance.toLocaleString()} credits**. Your bet is **${bet.toLocaleString()} credits**.`);
+    await message.reply(`You only have **${result.balance.toLocaleString()} credits** to bet.`);
     return;
   }
   if (result.status === "maximum") {
@@ -81,13 +85,13 @@ export async function handleCoinflipCommand(message: Message, args: string[] = m
 
   const chosenSide = side === "heads" ? "heads" : "tails";
   const resultMessage = await message.reply(
-    `**${message.author.displayName}** spent **${CREDITS_EMOJI} ${bet.toLocaleString()}** and chose **${chosenSide}**`,
+    `**${message.author.displayName}** spent **${CREDITS_EMOJI} ${result.bet.toLocaleString()}** and chose **${chosenSide}**`,
   );
   await new Promise((resolve) => setTimeout(resolve, COINFLIP_DELAY_MS));
   const landedEmoji = result.landed === "heads" ? HEADS_EMOJI : TAILS_EMOJI;
   await resultMessage.edit(
     result.won
-        ? `${COINFLIP_EMOJI} The coin spins... ${landedEmoji} and you won **${CREDITS_EMOJI} ${bet.toLocaleString()}**!`
+        ? `${COINFLIP_EMOJI} The coin spins... ${landedEmoji} and you won **${CREDITS_EMOJI} ${result.bet.toLocaleString()}**!`
         : `${COINFLIP_EMOJI} The coin spins... ${landedEmoji} and you lost it all... :c`,
   );
 }
