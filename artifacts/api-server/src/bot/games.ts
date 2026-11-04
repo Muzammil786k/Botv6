@@ -13,13 +13,13 @@ import { botGameSettingsTable, db } from "@workspace/db";
 import { premiumColors, premiumMessagePayload } from "./presentation";
 import { awardGameCredits } from "./credits";
 
-const ROUND_TIME_MS = 30_000;
+const DEFAULT_ROUND_TIME_MS = 30_000;
+const EXTENDED_ROUND_TIME_MS = 60_000;
 const DEFAULT_INTERVAL_MINUTES = 30;
 const MIN_INTERVAL_MINUTES = 1;
 const MAX_INTERVAL_MINUTES = 24 * 60;
 const MAX_REWARD = 2_147_483_647;
-const EXISTING_GAME_REWARD = 200;
-const NEW_GAME_REWARD = 100;
+const DEFAULT_GAME_REWARD = 100;
 const GAME_EMOJIS = {
   capital: "<:world:1563228194247802882>",
   celebrity: "<:trophy:1558393071224365102>",
@@ -55,7 +55,8 @@ interface CapitalQuestion {
 interface CelebrityQuestion {
   name: string;
   clues: string;
-  imageUrl: string;
+  imageUrl?: string;
+  aliases?: string[];
 }
 
 interface LetterQuestion {
@@ -99,6 +100,25 @@ const CELEBRITY_QUESTIONS: CelebrityQuestion[] = [
   { name: "Shah Rukh Khan", clues: "I am an Indian actor known as the King of Bollywood.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/1/18/Shah_Rukh_Khan_graces_the_launch_of_the_new_Samsung_phone.jpg" },
   { name: "Cristiano Ronaldo", clues: "I am a Portuguese footballer known for many Champions League goals.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/8/8c/Cristiano_Ronaldo_2018.jpg" },
   { name: "Lady Gaga", clues: "I am a singer and actor known for Poker Face and A Star Is Born.", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/3/3f/Lady_Gaga_at_the_2018_Toronto_International_Film_Festival.jpg" },
+  { name: "Selena Gomez", clues: "I am a singer and actor known for Lose You to Love Me and Only Murders in the Building.", aliases: ["selena"] },
+  { name: "Justin Bieber", clues: "I am a Canadian singer known for Baby, Sorry, and Peaches.", aliases: ["justin"] },
+  { name: "Ariana Grande", clues: "I am a singer known for Thank U, Next, 7 Rings, and Positions.", aliases: ["ariana"] },
+  { name: "Ed Sheeran", clues: "I am a singer-songwriter known for Shape of You and Perfect.", aliases: ["ed"] },
+  { name: "Billie Eilish", clues: "I am a singer known for Bad Guy and What Was I Made For?", aliases: ["billie"] },
+  { name: "Drake", clues: "I am a Canadian rapper and singer known for Hotline Bling and God's Plan." },
+  { name: "Eminem", clues: "I am a rapper known for Lose Yourself and Without Me." },
+  { name: "Katy Perry", clues: "I am a singer known for Roar, Firework, and Dark Horse.", aliases: ["katy"] },
+  { name: "Jennifer Lopez", clues: "I am a singer and actor known as J.Lo.", aliases: ["jlo", "j lo"] },
+  { name: "Chris Hemsworth", clues: "I am an actor who played Thor in the Marvel films.", aliases: ["thor"] },
+  { name: "Robert Downey Jr.", clues: "I am an actor who played Iron Man in the Marvel films.", aliases: ["robert downey", "iron man"] },
+  { name: "Will Smith", clues: "I am an actor and rapper known for Men in Black and The Fresh Prince of Bel-Air.", aliases: ["will"] },
+  { name: "Jackie Chan", clues: "I am a Hong Kong actor and martial artist known for action-comedy films." },
+  { name: "MrBeast", clues: "I am a creator known for huge YouTube challenges and philanthropy.", aliases: ["mr beast"] },
+  { name: "Virat Kohli", clues: "I am an Indian cricketer known for batting and former India captaincy.", aliases: ["virat"] },
+  { name: "Neeraj Chopra", clues: "I am an Indian Olympic javelin champion.", aliases: ["neeraj"] },
+  { name: "Lionel Messi", clues: "I am an Argentine footballer and World Cup winner.", aliases: ["messi"] },
+  { name: "Kylian Mbappe", clues: "I am a French footballer known for pace and a World Cup final hat-trick.", aliases: ["mbappe", "kylian"] },
+  { name: "David Beckham", clues: "I am an English footballer known for my free kicks and the number 7.", aliases: ["beckham"] },
 ];
 
 const LETTER_QUESTIONS: LetterQuestion[] = [
@@ -201,7 +221,7 @@ function parseGameType(value: string | undefined): GameType | null {
   if (normalized === "letter" || normalized === "theme") return "letter";
   if (normalized === "trivia" || normalized === "quiz") return "trivia";
   if (normalized === "math" || normalized === "mathematics") return "math";
-  if (normalized === "number" || normalized === "guess") return "number";
+  if (normalized === "number" || normalized === "guess" || normalized === "count" || normalized === "counting") return "number";
   return null;
 }
 
@@ -211,7 +231,7 @@ function createQuestion(type: GameType): { prompt: string; answers: Set<string>;
     return {
       prompt: `What is the capital of **${question.country}**?`,
       answers: new Set([normalize(question.capital), ...(question.aliases ?? []).map(normalize)]),
-      reward: EXISTING_GAME_REWARD,
+      reward: DEFAULT_GAME_REWARD,
     };
   }
 
@@ -219,8 +239,8 @@ function createQuestion(type: GameType): { prompt: string; answers: Set<string>;
     const question = randomItem(CELEBRITY_QUESTIONS);
     return {
       prompt: `Who am I?\n${question.clues}`,
-      answers: new Set([normalize(question.name)]),
-      reward: EXISTING_GAME_REWARD,
+      answers: new Set([normalize(question.name), ...(question.aliases ?? []).map(normalize)]),
+      reward: DEFAULT_GAME_REWARD,
       imageUrl: question.imageUrl,
     };
   }
@@ -230,7 +250,7 @@ function createQuestion(type: GameType): { prompt: string; answers: Set<string>;
     return {
       prompt: `**LETTER: ${question.letter}**\n**THEME: ${question.theme.toUpperCase()}**\nName something in this theme that starts with **${question.letter}**.`,
       answers: new Set(question.answers.map(normalize)),
-      reward: EXISTING_GAME_REWARD,
+      reward: DEFAULT_GAME_REWARD,
     };
   }
 
@@ -245,7 +265,7 @@ function createQuestion(type: GameType): { prompt: string; answers: Set<string>;
     return {
       prompt: question.question,
       answers: new Set([normalize(question.answer), ...(question.aliases ?? []).map(normalize)]),
-      reward: NEW_GAME_REWARD,
+      reward: DEFAULT_GAME_REWARD,
       triviaOptions: options,
     };
   }
@@ -258,7 +278,7 @@ function createQuestion(type: GameType): { prompt: string; answers: Set<string>;
     return {
       prompt: `Solve: **${first} ${operation} ${second} = ?**`,
       answers: new Set([String(answer)]),
-      reward: NEW_GAME_REWARD,
+      reward: DEFAULT_GAME_REWARD,
     };
   }
 
@@ -266,7 +286,7 @@ function createQuestion(type: GameType): { prompt: string; answers: Set<string>;
   return {
     prompt: "Guess the secret number between **1 and 50**.",
     answers: new Set([String(answer)]),
-    reward: NEW_GAME_REWARD,
+    reward: DEFAULT_GAME_REWARD,
   };
 }
 
@@ -310,13 +330,13 @@ async function startGameRound(
   } satisfies Round;
   round.timer = setTimeout(() => {
     void endRound(guildId, channel, round);
-  }, ROUND_TIME_MS);
+  }, (round.type === "math" || round.type === "number") ? EXTENDED_ROUND_TIME_MS : DEFAULT_ROUND_TIME_MS);
   rounds.set(roundKey(guildId, channel.id), round);
 
   const embed = new EmbedBuilder()
     .setColor(premiumColors.brand)
     .setTitle(`${GAME_EMOJIS[type]} ${gameLabel(type)}`)
-    .setDescription(`${round.prompt}\n\n${GAME_EMOJIS.trophy} First correct answer wins ${GAME_EMOJIS.credits} **${round.reward} credits**.\n${GAME_EMOJIS.time} You have **30 seconds**!`);
+    .setDescription(`${round.prompt}\n\n${GAME_EMOJIS.trophy} First correct answer wins ${GAME_EMOJIS.credits} **${round.reward} credits**.\n${GAME_EMOJIS.time} You have **${round.type === "math" || round.type === "number" ? 60 : 30} seconds**!`);
   if (round.imageUrl) embed.setImage(round.imageUrl);
 
   await channel.send({
@@ -351,10 +371,12 @@ export async function handleCreditGameCommand(message: Message, args: string[]):
     const channel = message.mentions.channels.first();
     const intervalArgument = args.find((value) => parseInterval(value) !== null);
     const rewardArgument = args.find((value) => parseReward(value) !== null && value !== intervalArgument);
-    const intervalMinutes = intervalArgument ? parseInterval(intervalArgument) : DEFAULT_INTERVAL_MINUTES;
-    const reward = rewardArgument ? parseReward(rewardArgument) : NEW_GAME_REWARD;
+    const intervalMinutes = intervalArgument
+      ? parseInterval(intervalArgument)
+      : (gameType === "math" || gameType === "number" ? 1 : DEFAULT_INTERVAL_MINUTES);
+    const reward = rewardArgument ? parseReward(rewardArgument) : DEFAULT_GAME_REWARD;
     if (!channel || channel.type !== 0 || intervalMinutes === null || reward === null) {
-      await message.reply(`Usage: \`!games ${gameType} setup #channel [30m] [100]\`.`);
+      await message.reply(`Usage: \`!games ${gameType} setup #channel [${gameType === "math" || gameType === "number" ? "1m" : "30m"}] [100]\`.`);
       return;
     }
     const now = Date.now();
@@ -372,13 +394,13 @@ export async function handleCreditGameCommand(message: Message, args: string[]):
     const [setting] = await settings();
     await message.reply(setting
       ? `${GAME_EMOJIS[gameType]} **${gameLabel(gameType)}**: <#${setting.channelId}>\nInterval: ${setting.intervalMinutes} minutes\nReward: ${setting.reward} credits\nStatus: ${setting.enabled ? "enabled" : "paused"}\nNext game: ${setting.enabled ? `<t:${Math.floor(setting.nextGameAt / 1000)}:R>` : "paused"}`
-      : `🎮 **${gameLabel(gameType)}** is not configured. Use \`!games ${gameType} setup #channel [30m] [100]\`.`);
+      : `🎮 **${gameLabel(gameType)}** is not configured. Use \`!games ${gameType} setup #channel [${gameType === "math" || gameType === "number" ? "1m" : "30m"}] [100]\`.`);
     return;
   }
 
   const [setting] = await settings();
   if (!setting) {
-    await message.reply(`❌ Configure **${gameLabel(gameType)}** first with \`!games ${gameType} setup #channel [30m] [100]\`.`);
+    await message.reply(`❌ Configure **${gameLabel(gameType)}** first with \`!games ${gameType} setup #channel [${gameType === "math" || gameType === "number" ? "1m" : "30m"}] [100]\`.`);
     return;
   }
   const now = Date.now();
@@ -472,18 +494,19 @@ export async function handleCreditGameInteraction(interaction: ButtonInteraction
     return;
   }
 
+  const channel = interaction.channel;
+  if (!channel || channel.type !== ChannelType.GuildText) return;
+  if (!round.answers.has(normalize(selected))) {
+    await interaction.reply({ content: `${GAME_EMOJIS.time} Wrong answer. Try again!`, ephemeral: true });
+    return;
+  }
+
+  if (rounds.get(roundKey(guildId, channelId)) !== round) return;
   rounds.delete(roundKey(guildId, channelId));
   clearTimeout(round.timer);
   await interaction.update({ components: [] });
-
-  const channel = interaction.channel;
-  if (!channel || channel.type !== ChannelType.GuildText) return;
-  if (round.answers.has(normalize(selected))) {
-    await awardGameCredits(guildId, interaction.user.id, round.reward);
-    await channel.send(premiumMessagePayload(`${GAME_EMOJIS.reward} <@${interaction.user.id}> selected the correct answer and won ${GAME_EMOJIS.credits} **${round.reward} credits**!`, channel.client.user));
-  } else {
-    await interaction.followUp({ content: `${GAME_EMOJIS.time} Wrong answer. This trivia round is now closed.`, ephemeral: true });
-  }
+  await awardGameCredits(guildId, interaction.user.id, round.reward);
+  await channel.send(premiumMessagePayload(`${GAME_EMOJIS.reward} <@${interaction.user.id}> selected the correct answer and won ${GAME_EMOJIS.credits} **${round.reward} credits**!`, channel.client.user));
 }
 
 export async function handleCreditGameAnswer(message: Message): Promise<void> {

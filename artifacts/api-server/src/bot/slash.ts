@@ -22,6 +22,14 @@ const slashCommands = [
     .setName("help")
     .setDescription("Show the complete command help menu."),
   new SlashCommandBuilder()
+    .setName("coinflip")
+    .setDescription("Bet credits on a coin flip.")
+    .addStringOption((o) => o.setName("side").setDescription("Heads or tails").setChoices(
+      { name: "Heads", value: "heads" },
+      { name: "Tails", value: "tails" },
+    ).setRequired(true))
+    .addIntegerOption((o) => o.setName("bet").setDescription("Credits to wager (1–250000)").setMinValue(1).setMaxValue(250000).setRequired(true)),
+  new SlashCommandBuilder()
     .setName("gstart")
     .setDescription("Start a giveaway.")
     .addStringOption((o) => o.setName("duration").setDescription("Duration, e.g. 30s, 5m, 2h, 1d").setRequired(true))
@@ -608,6 +616,8 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
     }
     case "afk":
       return `!afk ${string("status")}`.trim();
+    case "coinflip":
+      return `!coinflip ${string("side")} ${integer("bet")}`;
     case "warn":
       return `!warn ${mentionContent(interaction, "user")} ${string("reason")}`.trim();
     case "warnings":
@@ -882,6 +892,14 @@ export async function handleSlashCommand(client: Client, interaction: ChatInputC
   }
 
   try {
+    if (interaction.commandName === "help") {
+      await interaction.reply({
+        content: "For private command instructions, send `!help` or `!help games` to me in a direct message.",
+        ephemeral: true,
+      });
+      return;
+    }
+
     if (interaction.commandName === "voice") {
       await interaction.reply({ content: VC_HELP_TEXT, ephemeral: true });
       return;

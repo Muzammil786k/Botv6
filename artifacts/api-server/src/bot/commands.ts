@@ -60,6 +60,7 @@ import { handleEmbedCommand } from "./embeds";
 import { handleStatusRoleCommand } from "./statusRole";
 import { handleGuildTagRoleCommand } from "./guildTagRole";
 import { handleAutoEmergencyCommand } from "./emergency";
+import { handleCoinflipCommand, handleGambleCommand, logGamblingError } from "./gambling";
 import { logger } from "../lib/logger";
 
 const PREFIX = "!";
@@ -70,10 +71,17 @@ export async function handleMessage(
   options: { skipAutoModeration?: boolean } = {},
 ): Promise<void> {
   if (incomingMessage.author.bot) return;
-  if (!incomingMessage.guild) return;
   const message = withPremiumReplies(incomingMessage, client.user);
 
   const raw = message.content.trim();
+  if (!incomingMessage.guild) {
+    const helpMatch = /^!help(?:\s+(\S+))?$/i.exec(raw);
+    if (helpMatch) {
+      await handleHelp(message, helpMatch[1]);
+    }
+    return;
+  }
+
   const noPrefix = hasNoPrefix(message);
   const content = (!raw.startsWith("!") && noPrefix) ? `!${raw}` : raw;
 
@@ -114,6 +122,24 @@ export async function handleMessage(
     await handleCreditGameCommand(message, content.split(/\s+/).slice(1));
     return;
   }
+  if (lower === "!coinflip" || lower.startsWith("!coinflip ") || lower === "!cf" || lower.startsWith("!cf ")) {
+    try {
+      await handleCoinflipCommand(message, content.split(/\s+/).slice(1));
+    } catch (error) {
+      logGamblingError(error, incomingMessage.guild.id, message.author.id);
+      await message.reply("❌ Could not process the coinflip right now. Please try again.");
+    }
+    return;
+  }
+  if (lower === "!gamble" || lower.startsWith("!gamble ")) {
+    try {
+      await handleGambleCommand(message, content.split(/\s+/).slice(1));
+    } catch (error) {
+      logGamblingError(error, incomingMessage.guild.id, message.author.id);
+      await message.reply("❌ Could not process the gambling command right now. Please try again.");
+    }
+    return;
+  }
 
   // ── Giveaway ──────────────────────────────────────────────────────────────
   if (lower === `!${PREFIX}start` || lower.startsWith(`!${PREFIX}start `)) {
@@ -124,8 +150,8 @@ export async function handleMessage(
     await handleGreroll(client, message);
 
   // ── Help ──────────────────────────────────────────────────────────────────
-  } else if (lower === `!${PREFIX}help` || lower === "!help") {
-    await handleHelp(message);
+  } else if (lower === `!${PREFIX}help` || lower.startsWith(`!${PREFIX}help `) || lower === "!help" || lower.startsWith("!help ")) {
+    return;
 
   // ── Channel Automations ────────────────────────────────────────────────────
   } else if (lower === "!autoresponder" || lower.startsWith("!autoresponder ")) {

@@ -1,0 +1,98 @@
+import { randomInt } from "node:crypto";
+import { and, eq } from "drizzle-orm";
+import { type Message } from "discord.js";
+import { botMiningProfilesTable, db } from "@workspace/db";
+import { logger } from "../lib/logger";
+
+const MIN_BET = 1;
+const MAX_BET = 250_000;
+const MAX_BALANCE = 2_147_483_647;
+const COINFLIP_EMOJI = "<a:coinflip:1567512384338133093>";
+const HEADS_EMOJI = "<:heads:1567519192230400010>";
+const TAILS_EMOJI = "<:tails:1567519233418465380>";
+
+type CoinSide = "heads" | "tails";
+
+function parseSide(value: string | undefined): CoinSide | null {
+  const side = value?.toLowerCase();
+  if (side === "heads" || side === "head" || side === "h") return "heads";
+  if (side === "tails" || side === "tail" || side === "t") return "tails";
+  return null;
+}
+
+function parseBet(value: string | undefined): number {
+  if (!/^\d+$/.test(value ?? "")) return NaN;
+  const bet = Number(value);
+  return Number.isSafeInteger(bet) && bet >= MIN_BET && bet <= MAX_BET ? bet : NaN;
+}
+
+export async function handleCoinflipCommand(message: Message, args: string[] = message.content.trim().split(/\s+/).slice(1)): Promise<void> {
+  const guild = message.guild;
+  if (!guild) return;
+
+  const [first, second] = args;
+  const bet = parseBet(first) || parseBet(second);
+  const side = parseSide(first) ?? parseSide(second) ?? (Number.isSafeInteger(bet)
+    ? (randomInt(2) === 0 ? "heads" : "tails")
+    : null);
+  if (!side || !Number.isSafeInteger(bet)) {
+    await message.reply(`Usage: \`!coinflip <heads|tails> <bet>\`, \`!cf <bet> <h|t>\`, or \`!cf <bet>\` for a random side (bet: ${MIN_BET.toLocaleString()}–${MAX_BET.toLocaleString()} credits).`);
+    return;
+  }
+
+  const result = await db.transaction(async (tx) => {
+    await tx.insert(botMiningProfilesTable)
+      .values({ guildId: guild.id, userId: message.author.id })
+      .onConflictDoNothing();
+    const [profile] = await tx.select({ coins: botMiningProfilesTable.coins })
+      .from(botMiningProfilesTable)
+      .where(and(
+        eq(botMiningProfilesTable.guildId, guild.id),
+        eq(botMiningProfilesTable.userId, message.author.id),
+      ))
+      .for("update");
+    if (!profile) throw new Error("Could not load gambling credit profile");
+    if (profile.coins < bet) return { status: "insufficient" as const, balance: profile.coins };
+
+    const landed = randomInt(2) === 0 ? "heads" : "tails";
+    const won = landed === side;
+    const balance = won ? profile.coins + bet : profile.coins - bet;
+    if (balance > MAX_BALANCE) return { status: "maximum" as const };
+
+    await tx.update(botMiningProfilesTable)
+      .set({ coins: balance, updatedAt: new Date() })
+      .where(and(
+        eq(botMiningProfilesTable.guildId, guild.id),
+        eq(botMiningProfilesTable.userId, message.author.id),
+      ));
+    return { status: "played" as const, landed, won, balance };
+  });
+
+  if (result.status === "insufficient") {
+    await message.reply(`You only have **${result.balance.toLocaleString()} credits**. Your bet is **${bet.toLocaleString()} credits**.`);
+    return;
+  }
+  if (result.status === "maximum") {
+    await message.reply("That win would exceed the maximum credit balance.");
+    return;
+  }
+
+  await message.reply(
+    result.won
+        ? `${COINFLIP_EMOJI} ${result.landed === "heads" ? HEADS_EMOJI : TAILS_EMOJI} — You won **${bet.toLocaleString()} credits**! Balance: **${result.balance.toLocaleString()}**.`
+        : `${COINFLIP_EMOJI} ${result.landed === "heads" ? HEADS_EMOJI : TAILS_EMOJI} — You lost **${bet.toLocaleString()} credits**. Balance: **${result.balance.toLocaleString()}**.`,
+  );
+}
+
+export async function handleGambleCommand(message: Message, args: string[]): Promise<void> {
+  const game = args[0]?.toLowerCase();
+  if (game === "coinflip" || game === "flip") {
+    await handleCoinflipCommand(message, args.slice(1));
+    return;
+  }
+  await message.reply("Usage: `!gamble coinflip <heads|tails> <bet>` or `!coinflip <heads|tails> <bet>`.");
+}
+
+export function logGamblingError(error: unknown, guildId?: string, userId?: string): void {
+  logger.error({ err: error, guildId, userId }, "Could not process gambling command");
+}

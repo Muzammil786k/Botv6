@@ -27,6 +27,27 @@ const CATEGORIES = [
   { label: "📊 Scores & Ships", value: "scores", description: "Aura, rizz, ratings, and ship checks" },
 ] as const;
 type CategoryId = (typeof CATEGORIES)[number]["value"];
+const CATEGORY_ALIASES: Record<string, CategoryId> = {
+  home: "home",
+  start: "start",
+  giveaway: "start",
+  giveaways: "start",
+  moderation: "moderation",
+  mod: "moderation",
+  controls: "controls",
+  server: "controls",
+  automation: "automation",
+  utility: "utility",
+  utilities: "utility",
+  games: "games",
+  game: "games",
+  economy: "economy",
+  credits: "economy",
+  friendly: "friendly",
+  affection: "affection",
+  reactions: "reactions",
+  scores: "scores",
+};
 
 function helpPage(title: string): EmbedBuilder {
   return new EmbedBuilder()
@@ -82,7 +103,7 @@ function page1(): EmbedBuilder {
   return helpPage("🧭 Start & Giveaways")
     .setDescription("Your command hub. Prefix and slash commands do the same thing.")
     .addFields(
-      { name: "`!help` • `/help`", value: "Show this complete help menu." },
+      { name: "`!help <category>`", value: "Open detailed help privately, for example `!help games` or `!help moderation`." },
       { name: "`!gstart <duration> [winners] <prize>` • `/gstart`", value: "Start a giveaway. **Example:** `!gstart 1d 2 Nitro`\n**Durations:** `30s` `5m` `2h` `1d`\n*(Manage Server)*" },
       { name: "`!gend <message_id>` • `/gend`", value: "End a running giveaway early.\n*(Manage Server)*" },
       { name: "`!greroll <message_id> [amount]` • `/greroll`", value: "Reroll one or more winners from an ended giveaway.\n*(Manage Server)*" },
@@ -201,7 +222,7 @@ function page5(): EmbedBuilder {
       { name: "`!wbstop` / `!wordbomb stop` • `/wbstop`", value: "Stop the current Word Bomb game in the configured games channel. *(Manage Server)*" },
       { name: "`!wbtop` • `/wbtop`", value: "Show the Word Bomb win leaderboard in the configured games channel." },
       { name: "`!truthordare [@user]` / `!tod` • `/truthordare`", value: "The selected player can choose a random Truth/Dare or write and submit their own prompt. Available only in the configured games channel." },
-      { name: "💰 **Credit Games**", value: "Configure each game separately: `!games trivia setup #channel 30m 100`, `!games math interval 15m`, `!games capital reward 200`, then use `status`, `pause`, `resume`, or `remove` with that game name. `/games args` supports the same syntax. Each game keeps its own channel, interval, and reward." },
+      { name: "💰 **Credit Games**", value: "Configure each game separately: `!games trivia setup #channel 30m 100`, `!games math setup #channel 1m 100`, `!games number setup #channel 1m 100`, then use `status`, `pause`, `resume`, or `remove` with that game name. Math and number rounds run on a 1-minute cooldown and stay open for 1 minute. The first correct answer in every game wins the same default 100 credits; `/games args` supports the same syntax.\n\n**Gambling:** `!coinflip heads 100`, `!cf 200 h`, `!cf 200` for a random side, or `!gamble coinflip tails 100`; `/coinflip` is also available. Bets are 1–250,000 credits and a win pays 1:1." },
       { name: "✅ **Command notes**", value: "Slash commands appear server-by-server after the bot starts. Prefix commands continue to work as before.\n\nFor accurate online/offline presence counts, enable **Server Members Intent** and **Presence Intent** in the Discord Developer Portal." },
       { name: "💳 **Credits**", value: "Check your balance with `!credit` or `!credits`. Earn **20 credits** from chat once per minute, **10–100 credits** in a reaction drop, or different random rewards for two active chatters every 30 minutes (21+ messages each in the last 10 minutes): **Common 50**, **Rare 100**, or very rare **Epic 200 credits**. Set their announcement channel with `!setchatreward #channel` or `/setchatreward`; check with `status`, or clear with `remove`. Spend credits on server roles with `!shop` and `!shop buy @role`." },
       { name: "🦉 **Credit drops**", value: "A random rarity drop appears on each configured channel. The first correct reaction wins **Common: 100–200**, **Rare: 200–500**, or **Epic: 500–1,000 credits**. Server managers can repeat `!creditdrop setup #channel [30m]` for multiple channels; remove one with `!creditdrop remove #channel`. Set an interval for all channels with `!creditdrop interval 1h` or one channel with `!creditdrop interval 1h #channel` (0m–24h). Check with `!creditdrop status`; pause or resume all channels, or one selected channel, with `!creditdrop pause [#channel]` / `resume [#channel]`." },
@@ -351,6 +372,19 @@ function buildHelpComponents(selected: CategoryId) {
   return [buildCategoryRow(selected), buildNavigationRow(selected)];
 }
 
+function helpIndex(message: Message): EmbedBuilder {
+  return helpPage("📖 Help Categories")
+    .setDescription("Help details are available privately. Use `!help <category>` in a direct message.")
+    .addFields(
+      ...CATEGORIES.filter(({ value }) => value !== "home").map((category) => ({
+        name: `${category.label} — \`!help ${category.value}\``,
+        value: category.description,
+        inline: true,
+      })),
+    )
+    .setFooter({ text: "Use !help <category> in DM for command details" });
+}
+
 function buildCategoryEmbed(category: CategoryId, message: Message): EmbedBuilder {
   const pageIndex = CATEGORIES.findIndex((item) => item.value === category);
   const embed = CATEGORY_BUILDERS[category]();
@@ -365,8 +399,17 @@ function buildCategoryEmbed(category: CategoryId, message: Message): EmbedBuilde
   return embed;
 }
 
-export async function handleHelp(message: Message): Promise<void> {
-  let currentCategory: CategoryId = "home";
+export async function handleHelp(message: Message, requestedCategory?: string): Promise<void> {
+  if (!requestedCategory) {
+    await message.reply({ embeds: [helpIndex(message)] });
+    return;
+  }
+
+  let currentCategory = CATEGORY_ALIASES[requestedCategory.toLowerCase()];
+  if (!currentCategory) {
+    await message.reply("Unknown help category. Try `!help games`, `!help moderation`, or `!help economy`.");
+    return;
+  }
 
   const helpMsg = await message.reply({
     embeds: [buildCategoryEmbed(currentCategory, message)],
