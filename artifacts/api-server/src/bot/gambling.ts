@@ -10,6 +10,7 @@ const MAX_BALANCE = 2_147_483_647;
 const COINFLIP_EMOJI = "<a:coinflip:1567512384338133093>";
 const HEADS_EMOJI = "<:heads:1567519192230400010>";
 const TAILS_EMOJI = "<:tails:1567519233418465380>";
+const COINFLIP_DELAY_MS = 1_500;
 
 type CoinSide = "heads" | "tails";
 
@@ -77,10 +78,12 @@ export async function handleCoinflipCommand(message: Message, args: string[] = m
     return;
   }
 
-  await message.reply(
+  const resultMessage = await message.reply(COINFLIP_EMOJI);
+  await new Promise((resolve) => setTimeout(resolve, COINFLIP_DELAY_MS));
+  await resultMessage.edit(
     result.won
-        ? `${COINFLIP_EMOJI} ${result.landed === "heads" ? HEADS_EMOJI : TAILS_EMOJI} — You won **${bet.toLocaleString()} credits**! Balance: **${result.balance.toLocaleString()}**.`
-        : `${COINFLIP_EMOJI} ${result.landed === "heads" ? HEADS_EMOJI : TAILS_EMOJI} — You lost **${bet.toLocaleString()} credits**. Balance: **${result.balance.toLocaleString()}**.`,
+        ? `${result.landed === "heads" ? HEADS_EMOJI : TAILS_EMOJI} — You won **${bet.toLocaleString()} credits**! Balance: **${result.balance.toLocaleString()}**.`
+        : `${result.landed === "heads" ? HEADS_EMOJI : TAILS_EMOJI} — You lost **${bet.toLocaleString()} credits**. Balance: **${result.balance.toLocaleString()}**.`,
   );
 }
 
