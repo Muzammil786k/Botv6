@@ -273,6 +273,8 @@ export async function handleMessage(
     await handleCreditTransferCommand(message);
   } else if (lower === "!credit" || lower.startsWith("!credit ") || lower === "!credits" || lower.startsWith("!credits ")) {
     await handleCreditCommand(message);
+  } else if (lower === "!cash" || lower.startsWith("!cash ")) {
+    await handleCreditCommand(message);
   } else if (lower === "!shop" || lower.startsWith("!shop ")) {
     const args = content.split(/\s+/).slice(1);
     await handleRoleShopCommand(message, args);
