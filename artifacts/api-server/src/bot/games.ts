@@ -20,6 +20,7 @@ const MIN_INTERVAL_MINUTES = 1;
 const MAX_INTERVAL_MINUTES = 24 * 60;
 const MAX_REWARD = 2_147_483_647;
 const DEFAULT_GAME_REWARD = 100;
+const CORRECT_ANSWER_REACTION = "<:tick:1563231489435504650>";
 const GAME_EMOJIS = {
   capital: "<:world:1563228194247802882>",
   celebrity: "<:trophy:1558393071224365102>",
@@ -282,9 +283,9 @@ function createQuestion(type: GameType): { prompt: string; answers: Set<string>;
     };
   }
 
-  const answer = Math.floor(Math.random() * 50) + 1;
+  const answer = Math.floor(Math.random() * 20) + 1;
   return {
-    prompt: "Guess the secret number between **1 and 50**.",
+    prompt: "Guess the secret number between **1 and 20**.",
     answers: new Set([String(answer)]),
     reward: DEFAULT_GAME_REWARD,
   };
@@ -295,19 +296,20 @@ async function endRound(
   channel: TextChannel,
   round: Round,
   winnerId?: string,
-): Promise<void> {
+): Promise<boolean> {
   const key = roundKey(guildId, channel.id);
-  if (rounds.get(key) !== round) return;
+  if (rounds.get(key) !== round) return false;
   rounds.delete(key);
   clearTimeout(round.timer);
 
   if (!winnerId) {
     await channel.send(premiumMessagePayload(`${GAME_EMOJIS.time} Time's up! Nobody solved the **${gameLabel(round.type)}** round.`, channel.client.user));
-    return;
+    return false;
   }
 
   await awardGameCredits(guildId, winnerId, round.reward);
   await channel.send(premiumMessagePayload(`${GAME_EMOJIS.reward} <@${winnerId}> solved **${gameLabel(round.type)}** first and won ${GAME_EMOJIS.credits} **${round.reward} credits**!`, channel.client.user));
+  return true;
 }
 
 async function startGameRound(
@@ -505,6 +507,7 @@ export async function handleCreditGameInteraction(interaction: ButtonInteraction
   rounds.delete(roundKey(guildId, channelId));
   clearTimeout(round.timer);
   await interaction.update({ components: [] });
+  await interaction.message.react(CORRECT_ANSWER_REACTION);
   await awardGameCredits(guildId, interaction.user.id, round.reward);
   await channel.send(premiumMessagePayload(`${GAME_EMOJIS.reward} <@${interaction.user.id}> selected the correct answer and won ${GAME_EMOJIS.credits} **${round.reward} credits**!`, channel.client.user));
 }
@@ -514,5 +517,7 @@ export async function handleCreditGameAnswer(message: Message): Promise<void> {
   const round = rounds.get(roundKey(message.guild.id, message.channel.id));
   if (!round || round.channelId !== message.channel.id) return;
   if (!round.answers.has(normalize(message.content))) return;
-  await endRound(message.guild.id, message.channel as TextChannel, round, message.author.id);
+  if (await endRound(message.guild.id, message.channel as TextChannel, round, message.author.id)) {
+    await message.react(CORRECT_ANSWER_REACTION);
+  }
 }
