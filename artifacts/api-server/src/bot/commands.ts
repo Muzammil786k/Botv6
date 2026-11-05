@@ -49,7 +49,6 @@ import { handleSocialRoleCommand } from "./socialRole";
 import { handleModerationRoleCommand } from "./moderationRole";
 import { handleModerationLimitCommand } from "./moderationLimits";
 import { handleSetGameCommand } from "./gameChannel";
-import { handleTruthOrDare } from "./truthordare";
 import { handleQuoteRoleCommand, handleSetQuoteCommand } from "./quoteChannel";
 import { handleCreditCommand, handleCreditLeaderboardCommand, handleCreditTransferCommand, handleRoleShopCommand } from "./roleShop";
 import { awardChatCredits, handleActiveChatRewardChannelCommand } from "./credits";
@@ -259,8 +258,6 @@ export async function handleMessage(
   // ── Fun / Games ───────────────────────────────────────────────────────────
   } else if (lower === "!setgame" || lower.startsWith("!setgame ")) {
     await handleSetGameCommand(message, content.split(/\s+/).slice(1));
-  } else if (lower === "!truthordare" || lower.startsWith("!truthordare ") || lower === "!tod" || lower.startsWith("!tod ")) {
-    await handleTruthOrDare(message);
   } else if (lower === "!wordbomb" || lower === "!wb") {
     await handleWordbomb(client, message);
   } else if (lower === "!wbstop" || lower === "!wordbomb stop") {

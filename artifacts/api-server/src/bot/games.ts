@@ -166,7 +166,13 @@ let scheduler: NodeJS.Timeout | undefined;
 let schedulerRunning = false;
 
 function normalize(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ");
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9 ]/g, "")
+    .replace(/\s+/g, " ");
 }
 
 function randomItem<T>(items: T[]): T {
@@ -250,7 +256,7 @@ function createQuestion(type: GameType): { prompt: string; answers: Set<string>;
     const question = randomItem(LETTER_QUESTIONS);
     return {
       prompt: `**LETTER: ${question.letter}**\n**THEME: ${question.theme.toUpperCase()}**\nName something in this theme that starts with **${question.letter}**.`,
-      answers: new Set(question.answers.map(normalize)),
+      answers: new Set(question.answers.map((answer) => normalize(answer))),
       reward: DEFAULT_GAME_REWARD,
     };
   }

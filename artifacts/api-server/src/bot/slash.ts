@@ -281,10 +281,6 @@ const slashCommands = [
     .setDescription("Configure automatic credit-reward games.")
     .addStringOption((option) => option.setName("args").setDescription("setup #channel 30m 100, status, interval, reward, pause, resume, or remove")),
   new SlashCommandBuilder()
-    .setName("truthordare")
-    .setDescription("Play Truth or Dare in the configured games channel.")
-    .addUserOption((o) => o.setName("user").setDescription("Player who chooses Truth or Dare")),
-  new SlashCommandBuilder()
     .setName("setgame")
     .setDescription("Choose the channel where server games can be played.")
     .addChannelOption((o) => o.setName("channel").setDescription("Games text channel").addChannelTypes(ChannelType.GuildText).setRequired(true)),
@@ -669,8 +665,6 @@ function buildLegacyContent(interaction: ChatInputCommandInteraction): string {
       const channel = interaction.options.getChannel("channel");
       return channel ? `!setchatreward <#${channel.id}>` : "!setchatreward status";
     }
-    case "truthordare":
-      return `!truthordare ${mentionContent(interaction, "user")}`.trim();
     case "games":
       return `!games ${string("args")}`.trim();
     case "voice":
