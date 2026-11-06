@@ -13,8 +13,7 @@ import { botGameSettingsTable, db } from "@workspace/db";
 import { premiumColors, premiumMessagePayload } from "./presentation";
 import { awardGameCredits } from "./credits";
 
-const DEFAULT_ROUND_TIME_MS = 30_000;
-const EXTENDED_ROUND_TIME_MS = 60_000;
+const ROUND_TIME_MS = 60_000;
 const DEFAULT_INTERVAL_MINUTES = 30;
 const MIN_INTERVAL_MINUTES = 1;
 const MAX_INTERVAL_MINUTES = 24 * 60;
@@ -289,9 +288,9 @@ function createQuestion(type: GameType): { prompt: string; answers: Set<string>;
     };
   }
 
-  const answer = Math.floor(Math.random() * 20) + 1;
+  const answer = Math.floor(Math.random() * 10) + 1;
   return {
-    prompt: "Guess the secret number between **1 and 20**.",
+    prompt: "Guess the secret number between **1 and 10**.",
     answers: new Set([String(answer)]),
     reward: DEFAULT_GAME_REWARD,
   };
@@ -303,10 +302,7 @@ async function endRound(
   round: Round,
   winnerId?: string,
 ): Promise<boolean> {
-  const key = roundKey(guildId, channel.id);
-  if (rounds.get(key) !== round) return false;
-  rounds.delete(key);
-  clearTimeout(round.timer);
+  if (!claimRound(guildId, channel.id, round)) return false;
 
   if (!winnerId) {
     await channel.send(premiumMessagePayload(`${GAME_EMOJIS.time} Time's up! Nobody solved the **${gameLabel(round.type)}** round.`, channel.client.user));
@@ -315,6 +311,14 @@ async function endRound(
 
   await awardGameCredits(guildId, winnerId, round.reward);
   await channel.send(premiumMessagePayload(`${GAME_EMOJIS.reward} <@${winnerId}> solved **${gameLabel(round.type)}** first and won ${GAME_EMOJIS.credits} **${round.reward} credits**!`, channel.client.user));
+  return true;
+}
+
+function claimRound(guildId: string, channelId: string, round: Round): boolean {
+  const key = roundKey(guildId, channelId);
+  if (rounds.get(key) !== round) return false;
+  rounds.delete(key);
+  clearTimeout(round.timer);
   return true;
 }
 
@@ -338,13 +342,13 @@ async function startGameRound(
   } satisfies Round;
   round.timer = setTimeout(() => {
     void endRound(guildId, channel, round);
-  }, (round.type === "math" || round.type === "number") ? EXTENDED_ROUND_TIME_MS : DEFAULT_ROUND_TIME_MS);
+  }, ROUND_TIME_MS);
   rounds.set(roundKey(guildId, channel.id), round);
 
   const embed = new EmbedBuilder()
     .setColor(premiumColors.brand)
     .setTitle(`${GAME_EMOJIS[type]} ${gameLabel(type)}`)
-    .setDescription(`${round.prompt}\n\n${GAME_EMOJIS.trophy} First correct answer wins ${GAME_EMOJIS.credits} **${round.reward} credits**.\n${GAME_EMOJIS.time} You have **${round.type === "math" || round.type === "number" ? 60 : 30} seconds**!`);
+    .setDescription(`${round.prompt}\n\n${GAME_EMOJIS.trophy} First correct answer wins ${GAME_EMOJIS.credits} **${round.reward} credits**.\n${GAME_EMOJIS.time} You have **60 seconds**!`);
   if (round.imageUrl) embed.setImage(round.imageUrl);
 
   await channel.send({
@@ -509,9 +513,7 @@ export async function handleCreditGameInteraction(interaction: ButtonInteraction
     return;
   }
 
-  if (rounds.get(roundKey(guildId, channelId)) !== round) return;
-  rounds.delete(roundKey(guildId, channelId));
-  clearTimeout(round.timer);
+  if (!claimRound(guildId, channelId, round)) return;
   await interaction.update({ components: [] });
   await interaction.message.react(CORRECT_ANSWER_REACTION);
   await awardGameCredits(guildId, interaction.user.id, round.reward);
