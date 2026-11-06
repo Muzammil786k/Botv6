@@ -49,7 +49,6 @@ import { handleSocialRoleCommand } from "./socialRole";
 import { handleModerationRoleCommand } from "./moderationRole";
 import { handleModerationLimitCommand } from "./moderationLimits";
 import { handleSetGameCommand } from "./gameChannel";
-import { handleTruthOrDare } from "./truthordare";
 import { handleQuoteRoleCommand, handleSetQuoteCommand } from "./quoteChannel";
 import { handleCreditCommand, handleCreditLeaderboardCommand, handleCreditTransferCommand, handleRoleShopCommand } from "./roleShop";
 import { awardChatCredits, handleActiveChatRewardChannelCommand } from "./credits";
@@ -60,6 +59,7 @@ import { handleEmbedCommand } from "./embeds";
 import { handleStatusRoleCommand } from "./statusRole";
 import { handleGuildTagRoleCommand } from "./guildTagRole";
 import { handleAutoEmergencyCommand } from "./emergency";
+import { handleCoinflipCommand, handleGambleCommand, logGamblingError } from "./gambling";
 import { logger } from "../lib/logger";
 
 const PREFIX = "!";
@@ -70,10 +70,21 @@ export async function handleMessage(
   options: { skipAutoModeration?: boolean } = {},
 ): Promise<void> {
   if (incomingMessage.author.bot) return;
-  if (!incomingMessage.guild) return;
   const message = withPremiumReplies(incomingMessage, client.user);
 
   const raw = message.content.trim();
+  if (!incomingMessage.guild) {
+    const helpMatch = /^!help(?:\s+(\S+))?$/i.exec(raw);
+    if (helpMatch) {
+      await handleHelp(message, helpMatch[1]);
+    }
+    return;
+  }
+
+  if (!raw.startsWith("!")) {
+    await handleCreditGameAnswer(message);
+  }
+
   const noPrefix = hasNoPrefix(message);
   const content = (!raw.startsWith("!") && noPrefix) ? `!${raw}` : raw;
 
@@ -87,7 +98,6 @@ export async function handleMessage(
 
   if (!raw.startsWith("!")) {
     await handleFlagDropAnswer(message);
-    await handleCreditGameAnswer(message);
   }
 
   if (!content.startsWith("!") && !noPrefix) return;
@@ -114,6 +124,24 @@ export async function handleMessage(
     await handleCreditGameCommand(message, content.split(/\s+/).slice(1));
     return;
   }
+  if (lower === "!coinflip" || lower.startsWith("!coinflip ") || lower === "!cf" || lower.startsWith("!cf ")) {
+    try {
+      await handleCoinflipCommand(message, content.split(/\s+/).slice(1));
+    } catch (error) {
+      logGamblingError(error, incomingMessage.guild.id, message.author.id);
+      await message.reply("❌ Could not process the coinflip right now. Please try again.");
+    }
+    return;
+  }
+  if (lower === "!gamble" || lower.startsWith("!gamble ")) {
+    try {
+      await handleGambleCommand(message, content.split(/\s+/).slice(1));
+    } catch (error) {
+      logGamblingError(error, incomingMessage.guild.id, message.author.id);
+      await message.reply("❌ Could not process the gambling command right now. Please try again.");
+    }
+    return;
+  }
 
   // ── Giveaway ──────────────────────────────────────────────────────────────
   if (lower === `!${PREFIX}start` || lower.startsWith(`!${PREFIX}start `)) {
@@ -124,8 +152,8 @@ export async function handleMessage(
     await handleGreroll(client, message);
 
   // ── Help ──────────────────────────────────────────────────────────────────
-  } else if (lower === `!${PREFIX}help` || lower === "!help") {
-    await handleHelp(message);
+  } else if (lower === `!${PREFIX}help` || lower.startsWith(`!${PREFIX}help `) || lower === "!help" || lower.startsWith("!help ")) {
+    return;
 
   // ── Channel Automations ────────────────────────────────────────────────────
   } else if (lower === "!autoresponder" || lower.startsWith("!autoresponder ")) {
@@ -233,8 +261,6 @@ export async function handleMessage(
   // ── Fun / Games ───────────────────────────────────────────────────────────
   } else if (lower === "!setgame" || lower.startsWith("!setgame ")) {
     await handleSetGameCommand(message, content.split(/\s+/).slice(1));
-  } else if (lower === "!truthordare" || lower.startsWith("!truthordare ") || lower === "!tod" || lower.startsWith("!tod ")) {
-    await handleTruthOrDare(message);
   } else if (lower === "!wordbomb" || lower === "!wb") {
     await handleWordbomb(client, message);
   } else if (lower === "!wbstop" || lower === "!wordbomb stop") {
@@ -246,6 +272,8 @@ export async function handleMessage(
   } else if (lower === "!transfer" || lower.startsWith("!transfer ") || lower === "!give" || lower.startsWith("!give ")) {
     await handleCreditTransferCommand(message);
   } else if (lower === "!credit" || lower.startsWith("!credit ") || lower === "!credits" || lower.startsWith("!credits ")) {
+    await handleCreditCommand(message);
+  } else if (lower === "!cash" || lower.startsWith("!cash ")) {
     await handleCreditCommand(message);
   } else if (lower === "!shop" || lower.startsWith("!shop ")) {
     const args = content.split(/\s+/).slice(1);

@@ -105,7 +105,7 @@ export async function handleSetGameCommand(message: Message, args: string[]): Pr
         set: { channelId: channel.id, updatedAt: new Date() },
       });
     gameChannelCache.set(guild.id, { expiresAt: Date.now() + CONFIG_CACHE_MS, channelId: channel.id });
-    await message.reply(`✅ Word Bomb, Truth or Dare, and credit games are now restricted to ${channel as TextChannel}.`);
+    await message.reply(`✅ Word Bomb and credit games are now restricted to ${channel as TextChannel}.`);
   } catch (err) {
     logger.error({ err, guildId: guild.id, channelId }, "Failed to set game channel");
     await message.reply("❌ Could not save the game channel. Please try again.");
